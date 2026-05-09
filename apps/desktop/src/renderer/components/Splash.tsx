@@ -1,5 +1,5 @@
 import { product } from '@bullebrowser/brand-tokens';
-import wordmarkLight from '@bullebrowser/brand-tokens/wordmark-light.svg';
+import wordmarkLight from '@bullebrowser/brand-tokens/wordmark-light.png';
 
 export function Splash() {
   return (

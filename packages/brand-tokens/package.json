@@ -8,8 +8,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./logo.svg": "./assets/logo.svg",
-    "./wordmark.svg": "./assets/wordmark.svg",
-    "./wordmark-light.svg": "./assets/wordmark-light.svg"
+    "./wordmark.png": "./assets/wordmark.png",
+    "./wordmark-light.png": "./assets/wordmark-light.png"
   },
   "scripts": {
     "lint": "eslint src",

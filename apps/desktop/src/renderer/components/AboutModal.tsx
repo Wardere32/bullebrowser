@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { product } from '@bullebrowser/brand-tokens';
-import wordmark from '@bullebrowser/brand-tokens/wordmark.svg';
+import wordmark from '@bullebrowser/brand-tokens/wordmark.png';
 import { useBrowserStore } from '../state/browser-store.js';
 import type { AppInfo } from '../../shared/ipc.js';
 import { Modal } from './Modal.js';
