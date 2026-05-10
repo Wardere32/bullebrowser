@@ -10,25 +10,46 @@ on:
 permissions:
   contents: read
 
+# Cancel older runs on the same ref to keep the queue tidy.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality:
     runs-on: ubuntu-22.04
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
+      # Pin pnpm explicitly to fix intermittent pnpm/action-setup
+      # failures when packageManager/lockfile resolution drifts.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+          run_install: false
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
 
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm -r typecheck
-      - run: pnpm -r lint
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type-check (recursive)
+        run: pnpm -r typecheck
+
+      - name: Lint (recursive)
+        run: pnpm -r lint
+
       - name: Tests with coverage gate
         run: pnpm --filter @bullebrowser/agent-core test
+
       - name: Web build smoke
         run: pnpm --filter @bullebrowser/web build
+
       - name: Desktop build smoke
         run: pnpm --filter @bullebrowser/desktop build
