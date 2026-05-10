@@ -37,7 +37,7 @@ jobs:
           aws-region: us-east-1
       - name: Deploy to AWS Amplify
         run: |
-          cd apps/web/dist
+          cd apps/web/out
           zip -r ../build.zip .
           cd ..
           DEPLOY=$(aws amplify create-deployment \
