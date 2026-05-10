@@ -16,36 +16,38 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-22.04
-    env:
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
-
       - run: pnpm install --frozen-lockfile
-
       - name: Type-check
         run: pnpm --filter @bullebrowser/web typecheck
-
-      - name: Install Vercel CLI
-        run: pnpm add -g vercel@latest
-
-      - name: Pull Vercel env
-        working-directory: apps/web
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-
       - name: Build
         working-directory: apps/web
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Deploy
-        working-directory: apps/web
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: pnpm build
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Deploy to AWS Amplify
+        run: |
+          cd apps/web/dist
+          zip -r ../build.zip .
+          cd ..
+          DEPLOY=$(aws amplify create-deployment \
+            --app-id ${{ secrets.AMPLIFY_APP_ID }} \
+            --branch-name updated)
+          JOB_ID=$(echo $DEPLOY | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['jobId'])")
+          ZIP_URL=$(echo $DEPLOY | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['zipUploadUrl'])")
+          curl -T build.zip "$ZIP_URL"
+          aws amplify start-deployment \
+            --app-id ${{ secrets.AMPLIFY_APP_ID }} \
+            --branch-name updated \
+            --job-id $JOB_ID
+          echo "Deployment started: $JOB_ID"
