@@ -5,147 +5,100 @@ import { DownloadButton } from '@/components/DownloadButton';
 import { BrowserMockup } from '@/components/BrowserMockup';
 import { asset } from '@/lib/asset';
 
-const HIGHLIGHTS = [
+const SKILLS = [
   {
     title: 'Grant scanner',
-    body: 'Tell the agent what you fund or pursue. It opens SAM.gov and Grants.gov, runs the searches, follows listings into detail pages, and returns a comparison table sorted by deadline — no copy-paste, no tab juggling.',
+    body: 'Keywords in. A deadline-sorted table of live SAM.gov and Grants.gov opportunities out.',
   },
   {
     title: 'RFP comparator',
-    body: 'Paste 2 to 4 RFP URLs. The agent reads each end-to-end, lifts the deadline, scope, eligibility, value, and evaluation criteria, and hands back a side-by-side breakdown ready for a go/no-go memo.',
+    body: 'Drop 2–4 RFP links. Get deadline, scope, eligibility, value, and criteria, side by side.',
   },
   {
     title: 'Compliance review',
-    body: 'Drop a document. The agent reads every clause, flags issues against EEO, FERPA, and ADA — plus your own checklist — and returns quoted clauses with section references for fast partner review.',
+    body: 'Drop a document. Clauses flagged against EEO, FERPA, and ADA — quoted, with sections.',
   },
 ];
 
 export default function HomePage() {
   return (
     <>
-      <section className="relative overflow-hidden bg-surface-dark text-ink-inverse">
-        <div className="mx-auto grid max-w-6xl items-center gap-12 px-6 py-20 md:grid-cols-[1.1fr_1fr]">
+      {/* Hero */}
+      <section className="bg-surface-dark text-ink-inverse">
+        <div className="mx-auto grid max-w-6xl items-center gap-14 px-6 py-24 md:grid-cols-[1.05fr_1fr] md:py-32">
           <div>
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent" />
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs tracking-wide">
+              <span className="h-1.5 w-1.5 rounded-full bg-accent" />
               Agentic AI · By {product.vendor}
             </div>
-            <h1 className="text-4xl font-bold leading-tight md:text-5xl">
-              An AI agent that drives a real browser — so you don&apos;t have to.
+            <h1 className="text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
+              The browser that does the work.
             </h1>
-            <p className="mt-4 max-w-xl text-base text-ink-inverse/80">
-              {product.name} is a desktop browser with a Claude-powered agent
-              that opens tabs, reads pages, fills forms, and extracts
-              structured data on your behalf. Purpose-built for grant
-              scanning, RFP triage, and compliance review — the work that
-              eats your week. Bring your own Anthropic API key; your prompts
-              go straight to your provider, never to {product.vendor}.
+            <p className="mt-6 max-w-md text-lg leading-relaxed text-ink-inverse/70">
+              An AI agent that opens tabs, reads pages, and extracts what you
+              need — for grants, RFPs, and compliance.
             </p>
-            <div className="mt-8 flex flex-wrap items-center gap-4">
+            <div className="mt-10 flex flex-wrap items-center gap-5">
               <DownloadButton />
-              <a href="#how-it-works" className="text-sm text-ink-inverse/80 underline">
+              <a href="#see" className="text-sm text-ink-inverse/70 underline-offset-4 hover:underline">
                 See how it works
               </a>
             </div>
           </div>
-          <div className="relative">
-            <BrowserMockup />
-          </div>
+          <BrowserMockup />
         </div>
       </section>
 
-      <section id="how-it-works" className="mx-auto max-w-6xl px-6 py-20">
-        <h2 className="text-3xl font-bold">The agent does the work. You ship the deliverable.</h2>
-        <p className="mt-2 max-w-2xl text-ink-secondary">
-          Three preset skills for the most common research tasks at nonprofits,
-          government agencies, and the firms that serve them — each one a
-          one-prompt replacement for an afternoon of browser tabs.
-        </p>
-        <div className="mt-10 grid gap-6 md:grid-cols-3">
-          {HIGHLIGHTS.map((h) => (
-            <article
-              key={h.title}
-              className="rounded-lg border border-line bg-surface-muted p-6"
-            >
-              <h3 className="text-lg font-semibold">{h.title}</h3>
-              <p className="mt-2 text-sm text-ink-secondary">{h.body}</p>
-            </article>
+      {/* Skills — one line each, lots of air */}
+      <section className="mx-auto max-w-6xl px-6 py-24 md:py-32">
+        <h2 className="max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
+          One prompt replaces an afternoon of tabs.
+        </h2>
+        <div className="mt-14 grid gap-x-12 gap-y-10 sm:grid-cols-3">
+          {SKILLS.map((s) => (
+            <div key={s.title}>
+              <h3 className="text-lg font-semibold">{s.title}</h3>
+              <p className="mt-2 text-[15px] leading-relaxed text-ink-secondary">{s.body}</p>
+            </div>
           ))}
         </div>
       </section>
 
-      <section className="border-t border-line">
-        <div className="mx-auto max-w-6xl px-6 py-20">
+      {/* See it in action — full-bleed screenshot */}
+      <section id="see" className="border-t border-line bg-surface-muted">
+        <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
           <div className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <h2 className="text-3xl font-bold">See it in action.</h2>
-              <p className="mt-2 max-w-2xl text-ink-secondary">
-                The real BulleBrowser screens — browser chrome on the left, AI
-                agent on the right, mid-task.
-              </p>
-            </div>
-            <Link href="/preview" className="text-sm font-medium text-primary underline">
-              View all screens →
+            <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">See it work.</h2>
+            <Link href="/preview" className="text-sm font-medium text-primary underline-offset-4 hover:underline">
+              All screens →
             </Link>
           </div>
-          <Link href="/preview" className="mt-8 block overflow-hidden rounded-xl border border-line shadow-sm">
+          <Link
+            href="/preview"
+            className="mt-10 block overflow-hidden rounded-2xl border border-line shadow-sm transition-shadow hover:shadow-md"
+          >
             <img
               src={asset('/screenshots/grant-scanner.png')}
-              alt="BulleBrowser running the Grant scanner skill against SAM.gov"
+              alt="BulleBrowser running the Grant scanner against SAM.gov"
               className="block w-full"
             />
           </Link>
         </div>
       </section>
 
-      <section className="border-t border-line bg-surface-muted">
-        <div className="mx-auto grid max-w-6xl gap-8 px-6 py-16 md:grid-cols-2 md:items-center">
-          <div>
-            <h2 className="text-3xl font-bold">Your data, your provider.</h2>
-            <p className="mt-3 text-ink-secondary">
-              {product.name} uses BYOK — bring your own Anthropic API key.
-              Prompts go directly from your machine to Anthropic. Nothing is
-              routed through {product.vendor}. There is no telemetry in v1.
-            </p>
-          </div>
-          <ul className="space-y-3 text-sm text-ink-primary">
-            <Bullet>API key stored encrypted in the OS keychain</Bullet>
-            <Bullet>Browsing history and conversations stored locally</Bullet>
-            <Bullet>Per-tool destructive-action confirmation</Bullet>
-            <Bullet>Hard 25-step cap per agent task</Bullet>
-          </ul>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-6xl px-6 py-20 text-center">
-        <h2 className="text-3xl font-bold">Put the agent to work.</h2>
-        <p className="mt-2 text-ink-secondary">
-          Free download. macOS, Windows, and Linux. Bring your own Anthropic
-          API key.
+      {/* Privacy — one statement */}
+      <section className="mx-auto max-w-6xl px-6 py-24 text-center md:py-32">
+        <h2 className="mx-auto max-w-3xl text-3xl font-semibold tracking-tight sm:text-4xl">
+          Your data stays yours.
+        </h2>
+        <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-ink-secondary">
+          Bring your own Anthropic key. Prompts go straight to your provider —
+          never to {product.vendor}. No telemetry.
         </p>
-        <div className="mt-8 inline-block">
+        <div className="mt-10 flex justify-center">
           <DownloadButton />
         </div>
       </section>
     </>
-  );
-}
-
-function Bullet({ children }: { children: React.ReactNode }) {
-  return (
-    <li className="flex items-start gap-2">
-      <svg
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="#2563EB"
-        strokeWidth="2.5"
-        className="mt-0.5 shrink-0"
-      >
-        <polyline points="20 6 9 17 4 12" />
-      </svg>
-      <span>{children}</span>
-    </li>
   );
 }
