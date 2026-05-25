@@ -1,5 +1,6 @@
 appId: com.bulleconsulting.bullebrowser
 productName: BulleBrowser
+executableName: BulleBrowser
 copyright: Copyright © 2026 Bulle Consulting
 
 directories:
@@ -11,6 +12,9 @@ files:
   - package.json
   - "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}"
   - "!**/*.{ts,tsx,map}"
+  - "!**/coverage/**"
+  - "!**/{test,tests,__tests__,.vitest}/**"
+  - "!**/{tsconfig.json,tsconfig.*.json,vitest.config.*,.eslintrc*,eslint.config.*}"
 
 asarUnpack:
   - resources/**

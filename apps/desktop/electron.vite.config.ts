@@ -2,9 +2,16 @@ import { resolve } from 'node:path';
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
 import react from '@vitejs/plugin-react';
 
+// The workspace packages are source-only TypeScript (their "main" points at
+// src/*.ts). They must be bundled into the main/preload output, not left as
+// externalized require()s, or production would try to load raw .ts at runtime.
+const bundleWorkspaceDeps = {
+  exclude: ['@bullebrowser/agent-core', '@bullebrowser/brand-tokens'],
+};
+
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    plugins: [externalizeDepsPlugin(bundleWorkspaceDeps)],
     build: {
       outDir: 'out/main',
       lib: { entry: resolve(__dirname, 'src/main/index.ts') },
@@ -16,7 +23,7 @@ export default defineConfig({
     },
   },
   preload: {
-    plugins: [externalizeDepsPlugin()],
+    plugins: [externalizeDepsPlugin(bundleWorkspaceDeps)],
     build: {
       outDir: 'out/preload',
       lib: { entry: resolve(__dirname, 'src/preload/index.ts') },
