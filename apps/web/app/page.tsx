@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { product } from '@bullebrowser/brand-tokens';
 import { DownloadButton } from '@/components/DownloadButton';
+import { AgentDemo } from '@/components/AgentDemo';
 
 const SKILLS = [
   { title: 'Grant scanner', body: 'Open opportunities from SAM.gov and Grants.gov, sorted by deadline.' },
@@ -11,26 +12,29 @@ const SKILLS = [
 export default function HomePage() {
   return (
     <>
-      {/* Hero — text-forward, no demo (that lives on /preview) */}
+      {/* Hero — text left, live agent demo on the right */}
       <section className="bg-surface-dark text-ink-inverse">
-        <div className="mx-auto max-w-4xl px-6 py-28 text-center md:py-40">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs tracking-wide">
-            <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-            Agentic AI · By {product.vendor}
+        <div className="mx-auto grid max-w-6xl items-center gap-14 px-6 py-24 md:grid-cols-[1.05fr_1fr] md:py-32">
+          <div>
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs tracking-wide">
+              <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+              Agentic AI · By {product.vendor}
+            </div>
+            <h1 className="text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
+              The browser that does the work.
+            </h1>
+            <p className="mt-6 max-w-md text-lg leading-relaxed text-ink-inverse/70">
+              An AI agent that researches grants, compares RFPs, and reviews
+              compliance — right inside your browser.
+            </p>
+            <div className="mt-10 flex flex-wrap items-center gap-5">
+              <DownloadButton />
+              <Link href="/preview" className="text-sm text-ink-inverse/70 underline-offset-4 hover:underline">
+                See it in action →
+              </Link>
+            </div>
           </div>
-          <h1 className="mx-auto max-w-3xl text-4xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
-            The browser that does the work.
-          </h1>
-          <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-ink-inverse/70">
-            An AI agent that researches grants, compares RFPs, and reviews
-            compliance — right inside your browser.
-          </p>
-          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <DownloadButton />
-            <Link href="/preview" className="text-sm text-ink-inverse/70 underline-offset-4 hover:underline">
-              See it in action →
-            </Link>
-          </div>
+          <AgentDemo />
         </div>
       </section>
 
