@@ -1,80 +1,151 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { product } from '@bullebrowser/brand-tokens';
 import { DownloadButton } from '@/components/DownloadButton';
 
 export const metadata: Metadata = {
   title: 'Features',
-  description: `Agent capabilities, preset skills, and privacy posture of ${product.name}.`,
+  description: `What the ${product.name} agent can do — capabilities, preset skills, controls, and privacy.`,
 };
+
+const TOOLS = [
+  ['Navigate', 'Open any URL in a live tab.'],
+  ['Read', 'Pull clean, readable text from the page.'],
+  ['Click & type', 'Operate forms and controls by label or selector.'],
+  ['Extract', 'Lift structured data to a schema you define.'],
+  ['Manage tabs', 'Open, switch, and coordinate across tabs.'],
+  ['Wait', 'Pause for an element or the network to settle.'],
+];
+
+const SKILLS = [
+  {
+    title: 'Grant scanner',
+    lede: 'Find funding without the tab-juggling.',
+    body: 'Give it keywords. It searches SAM.gov and Grants.gov, follows listings into detail pages, and returns a comparison table sorted by deadline — with award ceilings and links.',
+  },
+  {
+    title: 'RFP comparator',
+    lede: 'Go/no-go in minutes, not hours.',
+    body: 'Paste 2–4 RFP links. It reads each end to end and hands back a side-by-side of deadline, scope, eligibility, contract value, and evaluation criteria.',
+  },
+  {
+    title: 'Compliance review',
+    lede: 'Catch the gaps before review does.',
+    body: 'Drop a document. It flags clauses against EEO, FERPA, and ADA — plus any checklist items you add — and quotes each clause with its section reference.',
+  },
+];
+
+const CONTROLS = [
+  ['You stay in control', 'A live “Agent is working” indicator shows each step, and a Stop button cancels instantly.'],
+  ['No runaways', 'Every task is hard-capped at 25 actions.'],
+  ['Ask before acting', 'Form submissions and downloads require your explicit confirmation.'],
+  ['Your model', 'Choose Claude Opus, Sonnet, or Haiku per task.'],
+];
+
+function Section({
+  eyebrow,
+  title,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="border-t border-line py-20 md:py-28">
+      <div className="mx-auto max-w-5xl px-6">
+        <div className="text-xs font-semibold uppercase tracking-widest text-primary">{eyebrow}</div>
+        <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h2>
+        <div className="mt-10">{children}</div>
+      </div>
+    </section>
+  );
+}
 
 export default function FeaturesPage() {
   return (
-    <div className="mx-auto max-w-4xl px-6 py-16 prose-lite">
-      <h1 className="text-4xl font-bold">Features</h1>
-      <p className="text-ink-secondary">
-        {product.name} is a desktop browser with an AI agent built on
-        Anthropic&apos;s tool use. The agent operates the browser like a
-        person — opening tabs, reading pages, clicking, typing, and
-        extracting structured data — but in a deterministic, stoppable loop.
-      </p>
+    <>
+      {/* Intro */}
+      <section className="bg-surface-dark text-ink-inverse">
+        <div className="mx-auto max-w-5xl px-6 py-24 md:py-32">
+          <h1 className="max-w-3xl text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
+            An agent that operates the browser — so you don&apos;t have to.
+          </h1>
+          <p className="mt-6 max-w-2xl text-lg leading-relaxed text-ink-inverse/70">
+            {product.name} pairs a real, full-featured browser with a
+            Claude-powered agent. It works the web the way a person does —
+            reading, clicking, typing, extracting — but in a deterministic,
+            stoppable loop you can trust.
+          </p>
+        </div>
+      </section>
 
-      <h2>Agent capabilities</h2>
-      <p>
-        The agent has access to ten tools backed by the live browser
-        engine on the active tab — same DOM, same network stack, same
-        cookies as a human visitor:
-      </p>
-      <ul>
-        <li><strong>navigate</strong> — go to a URL</li>
-        <li><strong>read_page</strong> — return cleaned, readable text</li>
-        <li><strong>click</strong> — click by selector or visible text</li>
-        <li><strong>type</strong> — type into an input by selector or label</li>
-        <li><strong>extract</strong> — pull structured data per JSON schema</li>
-        <li><strong>screenshot</strong> — capture the viewport</li>
-        <li><strong>new_tab / switch_tab / list_tabs</strong> — manage tabs</li>
-        <li><strong>wait_for</strong> — wait for a selector or network idle</li>
-      </ul>
-      <p>
-        Each task is capped at 25 tool calls. A visible &quot;Agent is
-        working&quot; indicator shows the current step, and a Stop button
-        cancels in-flight work immediately. Destructive actions (form
-        submits, downloads) require an explicit confirmation.
-      </p>
+      {/* Capabilities */}
+      <Section eyebrow="Capabilities" title="It works the live web, not a stale index.">
+        <p className="max-w-2xl text-[15px] leading-relaxed text-ink-secondary">
+          The agent acts on the active tab — same pages, same logins, same
+          data you&apos;d see — through a focused set of actions:
+        </p>
+        <div className="mt-8 grid gap-x-10 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
+          {TOOLS.map(([name, desc]) => (
+            <div key={name}>
+              <div className="text-sm font-semibold">{name}</div>
+              <div className="mt-1 text-sm text-ink-secondary">{desc}</div>
+            </div>
+          ))}
+        </div>
+      </Section>
 
-      <h2>Preset skills</h2>
-      <h3>Grant scanner</h3>
-      <p>
-        You provide keywords. The agent navigates SAM.gov and Grants.gov,
-        runs the searches, extracts the listings, and returns a Markdown
-        comparison table sorted by deadline, with a one-paragraph
-        &quot;what stands out&quot; summary at the bottom.
-      </p>
+      {/* Skills */}
+      <Section eyebrow="Preset skills" title="Built for grants, RFPs, and compliance.">
+        <div className="grid gap-10 md:grid-cols-3">
+          {SKILLS.map((s) => (
+            <div key={s.title}>
+              <h3 className="text-lg font-semibold">{s.title}</h3>
+              <p className="mt-1 text-[15px] font-medium text-ink-primary">{s.lede}</p>
+              <p className="mt-2 text-[15px] leading-relaxed text-ink-secondary">{s.body}</p>
+            </div>
+          ))}
+        </div>
+      </Section>
 
-      <h3>RFP comparator</h3>
-      <p>
-        You paste 2 to 4 RFP URLs. The agent reads each in turn and
-        returns a side-by-side breakdown of issuing organization, deadline,
-        scope, eligibility, value, and evaluation criteria.
-      </p>
+      {/* Control & trust */}
+      <Section eyebrow="Control & trust" title="Powerful, but never on autopilot.">
+        <div className="grid gap-x-10 gap-y-8 sm:grid-cols-2">
+          {CONTROLS.map(([t, d]) => (
+            <div key={t}>
+              <div className="text-sm font-semibold">{t}</div>
+              <div className="mt-1 text-sm text-ink-secondary">{d}</div>
+            </div>
+          ))}
+        </div>
+      </Section>
 
-      <h3>Compliance review</h3>
-      <p>
-        You drop a URL or upload a document. The agent flags clauses
-        against EEO, FERPA, and ADA — plus any checklist items you add in
-        Settings. Output includes quoted clauses and section references.
-      </p>
+      {/* Privacy */}
+      <Section eyebrow="Privacy" title="Bring your own key. Keep your own data.">
+        <ul className="max-w-2xl space-y-3 text-[15px] leading-relaxed text-ink-secondary">
+          <li>Your prompts go straight to Anthropic — never to {product.vendor}.</li>
+          <li>Your API key is encrypted in your operating system&apos;s keychain.</li>
+          <li>History, bookmarks, and conversations stay on your device.</li>
+          <li>No analytics. No telemetry.</li>
+        </ul>
+      </Section>
 
-      <h2>Privacy posture</h2>
-      <ul>
-        <li>BYOK: your prompts go straight to Anthropic, never to {product.vendor}.</li>
-        <li>API keys live in the OS keychain (Keychain on macOS, libsecret on Linux, DPAPI on Windows).</li>
-        <li>Browsing history, bookmarks, and conversations are stored locally.</li>
-        <li>No telemetry in v1.</li>
-      </ul>
-
-      <div className="mt-8">
-        <DownloadButton />
-      </div>
-    </div>
+      {/* CTA */}
+      <section className="border-t border-line bg-surface-muted">
+        <div className="mx-auto max-w-3xl px-6 py-24 text-center">
+          <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">Put the agent to work.</h2>
+          <p className="mt-4 text-ink-secondary">Free download for macOS, Windows, and Linux.</p>
+          <div className="mt-8 flex justify-center">
+            <DownloadButton />
+          </div>
+          <div className="mt-4 text-sm">
+            <Link href="/preview" className="text-primary underline-offset-4 hover:underline">
+              See the app screens →
+            </Link>
+          </div>
+        </div>
+      </section>
+    </>
   );
 }
