@@ -1,83 +1,119 @@
 'use client';
 
-// Client component: detects the visitor's OS from navigator.userAgent and
-// links to the matching installer from the latest GitHub Release. Falls
-// back to the download page / releases page when nothing is published yet.
+// Resolves the right installer for the visitor's OS from the GitHub
+// Releases API (scanning recent releases so a partial release never leaves
+// anyone without a download), and always falls back to a working link.
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   detectPlatform,
-  fetchLatestRelease,
+  fetchDownloads,
   formatBytes,
+  isMobileUA,
+  platformFamily,
   RELEASES_PAGE,
-  type LatestRelease,
+  type Downloads,
   type Platform,
 } from '@/lib/releases';
 
-const PLATFORM_LABEL: Record<Platform, string> = {
-  'mac-arm64': 'Download for macOS (Apple Silicon)',
-  'mac-x64': 'Download for macOS (Intel)',
+const LABEL: Record<Platform, string> = {
+  'mac-arm64': 'Download for macOS · Apple Silicon',
+  'mac-x64': 'Download for macOS · Intel',
   'win-x64': 'Download for Windows',
-  'win-arm64': 'Download for Windows (ARM)',
+  'win-arm64': 'Download for Windows · ARM',
   'linux-x64': 'Download for Linux',
-  'linux-arm64': 'Download for Linux (ARM)',
+  'linux-arm64': 'Download for Linux · ARM',
 };
 
 export function DownloadButton({ size = 'lg' }: { size?: 'lg' | 'md' }) {
-  const [release, setRelease] = useState<LatestRelease | null>(null);
+  const [dl, setDl] = useState<Downloads | null>(null);
   const [platform, setPlatform] = useState<Platform>('mac-arm64');
+  const [mobile, setMobile] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     setPlatform(detectPlatform(navigator.userAgent));
-    fetchLatestRelease()
-      .then(setRelease)
+    setMobile(isMobileUA(navigator.userAgent));
+    fetchDownloads()
+      .then(setDl)
       .finally(() => setLoaded(true));
   }, []);
 
   const cls =
     size === 'lg'
-      ? 'rounded-md bg-primary px-5 py-3 text-base font-semibold text-white shadow-sm hover:bg-primary-hover'
-      : 'rounded-md bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary-hover';
+      ? 'inline-flex items-center justify-center rounded-md bg-primary px-5 py-3 text-base font-semibold text-white shadow-sm transition-colors hover:bg-primary-hover'
+      : 'inline-flex items-center justify-center rounded-md bg-primary px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover';
 
-  const asset = release?.downloadFor?.[platform];
+  const primary = dl?.forPlatform?.[platform];
+  // On Mac, offer the other arch too since UA can't distinguish them.
+  const macAlt =
+    platformFamily(platform) === 'mac'
+      ? dl?.forPlatform?.[platform === 'mac-arm64' ? 'mac-x64' : 'mac-arm64']
+      : undefined;
 
-  if (asset) {
+  if (mobile) {
     return (
       <div className="flex flex-col items-start gap-1">
-        <a href={asset.browserDownloadUrl} className={cls}>
-          {PLATFORM_LABEL[platform]}
+        <Link href="/download" className={cls}>
+          See desktop downloads
+        </Link>
+        <div className="text-xs text-ink-secondary">
+          BulleBrowser is a desktop app (macOS, Windows, Linux). Open this page
+          on your computer to install.
+        </div>
+      </div>
+    );
+  }
+
+  if (primary) {
+    return (
+      <div className="flex flex-col items-start gap-1.5">
+        <a href={primary.browserDownloadUrl} className={cls}>
+          {LABEL[platform]}
         </a>
         <div className="text-xs text-ink-secondary">
-          {release?.tagName} · {formatBytes(asset.size)} ·{' '}
+          {primary.tag} · {formatBytes(primary.size)}
+          {macAlt && (
+            <>
+              {' · '}
+              <a href={macAlt.browserDownloadUrl} className="underline">
+                {platform === 'mac-arm64' ? 'Intel Mac' : 'Apple Silicon'}
+              </a>
+            </>
+          )}
+          {' · '}
           <Link href="/download" className="underline">
             all platforms
+          </Link>
+          {' · '}
+          <Link href="/install" className="underline">
+            install help
           </Link>
         </div>
       </div>
     );
   }
 
-  // No matching asset: either nothing published yet, or this OS has no build.
+  // No matching asset / API issue: always give a working path forward.
   return (
-    <div className="flex flex-col items-start gap-1">
-      <Link href="/download" className={cls}>
+    <div className="flex flex-col items-start gap-1.5">
+      <a href={RELEASES_PAGE} className={cls}>
         Download BulleBrowser
-      </Link>
+      </a>
       <div className="text-xs text-ink-secondary">
-        {loaded && !release ? (
-          <>
-            No public release yet —{' '}
-            <a href={RELEASES_PAGE} className="underline">
-              watch the releases page
-            </a>
-          </>
-        ) : (
-          <Link href="/download" className="underline">
-            see all platforms
-          </Link>
-        )}
+        {loaded && dl?.apiUnavailable
+          ? 'Live version check is busy — '
+          : loaded && !dl?.latestTag
+            ? 'Preparing the first public release — '
+            : ''}
+        <a href={RELEASES_PAGE} className="underline">
+          all releases on GitHub
+        </a>
+        {' · '}
+        <Link href="/download" className="underline">
+          platforms &amp; checksums
+        </Link>
       </div>
     </div>
   );

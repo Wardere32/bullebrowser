@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import {
-  fetchLatestRelease,
+  fetchDownloads,
   formatBytes,
   RELEASES_PAGE,
-  type LatestRelease,
+  type Downloads,
   type Platform,
 } from '@/lib/releases';
 
@@ -19,31 +20,38 @@ const PLATFORMS: { key: Platform; label: string; req: string }[] = [
 ];
 
 export function DownloadTable() {
-  const [release, setRelease] = useState<LatestRelease | null>(null);
+  const [dl, setDl] = useState<Downloads | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    fetchLatestRelease()
-      .then(setRelease)
+    fetchDownloads()
+      .then(setDl)
       .finally(() => setLoaded(true));
   }, []);
+
+  const noneYet = loaded && dl && !dl.latestTag && !dl.apiUnavailable;
 
   return (
     <>
       <p className="mt-2 text-ink-secondary">
         {!loaded
           ? 'Checking for the latest release…'
-          : release
-            ? `Latest release: ${release.tagName} · published ${new Date(
-                release.publishedAt,
-              ).toLocaleDateString()}`
-            : 'No public release has been published yet. '}
-        {loaded && !release && (
+          : dl?.apiUnavailable
+            ? 'The live version check is busy right now. '
+            : dl?.latestTag
+              ? `Latest release: ${dl.latestTag}${
+                  dl.publishedAt
+                    ? ` · published ${new Date(dl.publishedAt).toLocaleDateString()}`
+                    : ''
+                }`
+              : 'No public release has been published yet. '}
+        {(dl?.apiUnavailable || noneYet) && (
           <a href={RELEASES_PAGE} className="text-primary underline">
-            Watch the releases page
+            Browse all releases on GitHub
           </a>
         )}
       </p>
+
       <div className="mt-8 overflow-hidden rounded-lg border border-line">
         <table className="w-full text-sm">
           <thead className="bg-surface-muted text-left text-xs uppercase tracking-wide text-ink-secondary">
@@ -51,13 +59,13 @@ export function DownloadTable() {
               <th className="px-4 py-3">Platform</th>
               <th className="px-4 py-3">Requirements</th>
               <th className="px-4 py-3">Size</th>
-              <th className="px-4 py-3">SHA-256</th>
+              <th className="px-4 py-3">Version</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
             {PLATFORMS.map((p) => {
-              const asset = release?.downloadFor?.[p.key];
+              const asset = dl?.forPlatform?.[p.key];
               return (
                 <tr key={p.key} className="border-t border-line">
                   <td className="px-4 py-3">{p.label}</td>
@@ -65,23 +73,12 @@ export function DownloadTable() {
                   <td className="px-4 py-3 text-ink-secondary">
                     {asset ? formatBytes(asset.size) : '—'}
                   </td>
-                  <td className="px-4 py-3 text-ink-secondary">
-                    {release?.checksumsAsset ? (
-                      <a
-                        href={release.checksumsAsset.browserDownloadUrl}
-                        className="text-primary underline"
-                      >
-                        checksums.txt
-                      </a>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
+                  <td className="px-4 py-3 text-ink-secondary">{asset?.tag ?? '—'}</td>
                   <td className="px-4 py-3 text-right">
                     {asset ? (
                       <a
                         href={asset.browserDownloadUrl}
-                        className="rounded bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-hover"
+                        className="inline-block rounded bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-hover"
                       >
                         Download
                       </a>
@@ -94,6 +91,20 @@ export function DownloadTable() {
             })}
           </tbody>
         </table>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-xs text-ink-secondary">
+        {dl?.checksumsUrl && (
+          <a href={dl.checksumsUrl} className="text-primary underline">
+            SHA-256 checksums.txt
+          </a>
+        )}
+        <Link href="/install" className="text-primary underline">
+          Installation &amp; first-launch guide
+        </Link>
+        <a href={RELEASES_PAGE} className="text-primary underline">
+          Release history
+        </a>
       </div>
     </>
   );
