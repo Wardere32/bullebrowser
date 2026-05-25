@@ -1,6 +1,9 @@
+/* eslint-disable @next/next/no-img-element */
+import Link from 'next/link';
 import { product } from '@bullebrowser/brand-tokens';
 import { DownloadButton } from '@/components/DownloadButton';
 import { BrowserMockup } from '@/components/BrowserMockup';
+import { asset } from '@/lib/asset';
 
 const HIGHLIGHTS = [
   {
@@ -68,6 +71,30 @@ export default function HomePage() {
               <p className="mt-2 text-sm text-ink-secondary">{h.body}</p>
             </article>
           ))}
+        </div>
+      </section>
+
+      <section className="border-t border-line">
+        <div className="mx-auto max-w-6xl px-6 py-20">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h2 className="text-3xl font-bold">See it in action.</h2>
+              <p className="mt-2 max-w-2xl text-ink-secondary">
+                The real BulleBrowser screens — browser chrome on the left, AI
+                agent on the right, mid-task.
+              </p>
+            </div>
+            <Link href="/preview" className="text-sm font-medium text-primary underline">
+              View all screens →
+            </Link>
+          </div>
+          <Link href="/preview" className="mt-8 block overflow-hidden rounded-xl border border-line shadow-sm">
+            <img
+              src={asset('/screenshots/grant-scanner.png')}
+              alt="BulleBrowser running the Grant scanner skill against SAM.gov"
+              className="block w-full"
+            />
+          </Link>
         </div>
       </section>
 

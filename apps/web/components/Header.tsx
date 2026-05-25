@@ -16,15 +16,15 @@ export function Header() {
             draggable={false}
           />
         </Link>
-        <nav className="flex items-center gap-6 text-sm">
-          <Link href="/features" className="text-ink-secondary hover:text-ink-primary">
+        <nav className="flex items-center gap-4 text-sm sm:gap-6">
+          <Link href="/features" className="hidden text-ink-secondary hover:text-ink-primary sm:inline">
             Features
           </Link>
-          <Link href="/privacy" className="text-ink-secondary hover:text-ink-primary">
-            Privacy
+          <Link href="/preview" className="text-ink-secondary hover:text-ink-primary">
+            Preview
           </Link>
-          <Link href="/about" className="text-ink-secondary hover:text-ink-primary">
-            About
+          <Link href="/install" className="hidden text-ink-secondary hover:text-ink-primary sm:inline">
+            Install
           </Link>
           <Link
             href="/download"

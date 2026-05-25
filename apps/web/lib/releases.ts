@@ -1,7 +1,8 @@
 // Client-side helpers for the GitHub Releases API. The site is a static
-// export hosted on GitHub Pages, so there is no server runtime — the
-// browser fetches the latest release directly and the CDN/browser cache
-// keeps us well under GitHub's anonymous rate limit.
+// export on GitHub Pages — no server — so the browser resolves downloads
+// directly. To guarantee every visitor gets a working installer even when
+// the newest release is partial (e.g. a Linux-only preview), we scan the
+// most recent releases and pick, per platform, the newest asset available.
 
 export type Platform =
   | 'mac-arm64'
@@ -15,78 +16,129 @@ export interface ReleaseAsset {
   name: string;
   browserDownloadUrl: string;
   size: number;
-  contentType: string;
+  /** Tag of the release this asset came from. */
+  tag: string;
 }
 
-export interface LatestRelease {
-  tagName: string;
-  publishedAt: string;
-  htmlUrl: string;
-  assets: ReleaseAsset[];
-  downloadFor: Partial<Record<Platform, ReleaseAsset>>;
-  checksumsAsset?: ReleaseAsset;
+export interface Downloads {
+  /** Newest published release tag (for display). */
+  latestTag: string | null;
+  publishedAt: string | null;
+  /** Best available installer per platform, newest-first across releases. */
+  forPlatform: Partial<Record<Platform, ReleaseAsset>>;
+  /** checksums.txt from the newest release that has one. */
+  checksumsUrl: string | null;
+  /** True only if the GitHub API could not be reached at all. */
+  apiUnavailable: boolean;
 }
 
 export const REPO_OWNER = 'wardere83';
 export const REPO_NAME = 'bullebrowser';
 export const RELEASES_PAGE = `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases`;
 
-export async function fetchLatestRelease(): Promise<LatestRelease | null> {
-  try {
-    const res = await fetch(
-      `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest`,
-      { headers: { Accept: 'application/vnd.github+json' } },
-    );
-    if (!res.ok) return null;
-    const data = (await res.json()) as {
-      tag_name: string;
-      published_at: string;
-      html_url: string;
-      assets: Array<{
-        name: string;
-        browser_download_url: string;
-        size: number;
-        content_type: string;
-      }>;
-    };
-    const assets: ReleaseAsset[] = (data.assets ?? []).map((a) => ({
-      name: a.name,
-      browserDownloadUrl: a.browser_download_url,
-      size: a.size,
-      contentType: a.content_type,
-    }));
-    return {
-      tagName: data.tag_name,
-      publishedAt: data.published_at,
-      htmlUrl: data.html_url,
-      assets,
-      downloadFor: detectPlatformAssets(assets),
-      checksumsAsset: assets.find((a) => /checksum/i.test(a.name)),
-    };
-  } catch {
-    return null;
-  }
+interface RawAsset {
+  name: string;
+  browser_download_url: string;
+  size: number;
+}
+interface RawRelease {
+  tag_name: string;
+  published_at: string;
+  draft: boolean;
+  prerelease: boolean;
+  assets: RawAsset[];
 }
 
-function detectPlatformAssets(assets: ReleaseAsset[]): LatestRelease['downloadFor'] {
-  const map: LatestRelease['downloadFor'] = {};
-  for (const a of assets) {
-    const n = a.name.toLowerCase();
-    if (n.endsWith('.dmg') && n.includes('arm64')) map['mac-arm64'] = a;
-    else if (n.endsWith('.dmg')) map['mac-x64'] ??= a;
-    else if (n.endsWith('.exe') && n.includes('arm64')) map['win-arm64'] = a;
-    else if (n.endsWith('.exe')) map['win-x64'] ??= a;
-    else if (n.endsWith('.appimage') && n.includes('arm64')) map['linux-arm64'] = a;
-    else if (n.endsWith('.appimage')) map['linux-x64'] ??= a;
+function classify(name: string): Platform | null {
+  const n = name.toLowerCase();
+  if (n.endsWith('.dmg')) return n.includes('arm64') ? 'mac-arm64' : 'mac-x64';
+  if (n.endsWith('.exe')) return n.includes('arm64') ? 'win-arm64' : 'win-x64';
+  if (n.endsWith('.appimage')) return n.includes('arm64') ? 'linux-arm64' : 'linux-x64';
+  return null;
+}
+
+export async function fetchDownloads(): Promise<Downloads> {
+  const empty: Downloads = {
+    latestTag: null,
+    publishedAt: null,
+    forPlatform: {},
+    checksumsUrl: null,
+    apiUnavailable: false,
+  };
+  let releases: RawRelease[];
+  try {
+    const res = await fetch(
+      `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases?per_page=15`,
+      { headers: { Accept: 'application/vnd.github+json' } },
+    );
+    if (!res.ok) {
+      // 404 = no releases yet; other non-OK = API issue we can still recover from.
+      return { ...empty, apiUnavailable: res.status >= 500 || res.status === 403 };
+    }
+    releases = (await res.json()) as RawRelease[];
+  } catch {
+    return { ...empty, apiUnavailable: true };
   }
-  return map;
+
+  // Newest first (the API already returns this order; sort defensively).
+  const published = releases
+    .filter((r) => !r.draft)
+    .sort(
+      (a, b) =>
+        new Date(b.published_at).getTime() - new Date(a.published_at).getTime(),
+    );
+
+  const forPlatform: Downloads['forPlatform'] = {};
+  let checksumsUrl: string | null = null;
+
+  for (const rel of published) {
+    for (const a of rel.assets) {
+      const platform = classify(a.name);
+      // First (newest) asset wins for each platform.
+      if (platform && !forPlatform[platform]) {
+        forPlatform[platform] = {
+          name: a.name,
+          browserDownloadUrl: a.browser_download_url,
+          size: a.size,
+          tag: rel.tag_name,
+        };
+      }
+      if (!checksumsUrl && /checksum/i.test(a.name)) {
+        checksumsUrl = a.browser_download_url;
+      }
+    }
+  }
+
+  const latest = published[0] ?? null;
+  return {
+    latestTag: latest?.tag_name ?? null,
+    publishedAt: latest?.published_at ?? null,
+    forPlatform,
+    checksumsUrl,
+    apiUnavailable: false,
+  };
 }
 
 export function detectPlatform(userAgent: string): Platform {
   const ua = userAgent.toLowerCase();
+  // macOS user-agents report "Intel" even on Apple Silicon, so we can't tell
+  // the arch from UA. Default to Apple Silicon (the common case today) and let
+  // the UI surface the Intel option alongside it.
   if (ua.includes('mac')) return 'mac-arm64';
   if (ua.includes('win')) return ua.includes('arm') ? 'win-arm64' : 'win-x64';
+  if (ua.includes('linux') && ua.includes('aarch64')) return 'linux-arm64';
+  if (ua.includes('android')) return 'linux-arm64'; // best-effort; mobile unsupported
   return 'linux-x64';
+}
+
+export function platformFamily(p: Platform): 'mac' | 'win' | 'linux' {
+  if (p.startsWith('mac')) return 'mac';
+  if (p.startsWith('win')) return 'win';
+  return 'linux';
+}
+
+export function isMobileUA(userAgent: string): boolean {
+  return /android|iphone|ipad|ipod|mobile/i.test(userAgent);
 }
 
 export function formatBytes(bytes: number): string {
