@@ -15,13 +15,16 @@ three platform binaries from the master logo before the first signed
 release using any standard converter (e.g. `iconutil` on macOS, an
 online .ico generator, `convert` from ImageMagick for the .png).
 
-To swap in a new wordmark:
+## Wordmark
 
-1. Drop the new dark-text SVG at `packages/brand-tokens/assets/wordmark.svg`.
-2. Drop the new light-text (white) SVG at
-   `packages/brand-tokens/assets/wordmark-light.svg`.
-3. Re-copy them to `apps/web/public/` (the landing page reads from there)
-   or run `pnpm dev:web` and the file watcher picks them up.
+The official BulleBrowser wordmark ships as PNG, with two variants:
 
-Both the desktop splash and the in-app About modal pull the wordmark
-from the brand-tokens package, so there is exactly one place to update.
+* `packages/brand-tokens/assets/wordmark.png` — black on transparent /
+  light backgrounds. Used on the landing page header.
+* `packages/brand-tokens/assets/wordmark-light.png` — white on
+  transparent / dark backgrounds. Used on the desktop splash and in
+  the About modal.
+
+To swap in a higher-resolution master, replace these two files and
+re-copy them to `apps/web/public/`. The file watcher picks them up on
+the next dev reload; production builds pick them up on rebuild.

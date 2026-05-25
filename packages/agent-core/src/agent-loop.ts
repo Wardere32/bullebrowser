@@ -27,25 +27,21 @@ export interface AgentInput {
   onStep: AgentStepHandler;
 }
 
-interface ContentBlock {
-  type: string;
-  text?: string;
-  id?: string;
-  name?: string;
-  input?: Record<string, unknown>;
-}
-
-interface AnthropicMessage {
-  role: 'user' | 'assistant';
-  content: string | ContentBlock[];
-}
+type MessageParam = Anthropic.MessageParam;
+type ContentBlockParam = Anthropic.ContentBlockParam;
+type ToolUseBlock = Anthropic.ToolUseBlock;
 
 export async function runAgent(input: AgentInput): Promise<string> {
   const client = new Anthropic({ apiKey: input.apiKey });
-  const tools = toAnthropicTools();
+  // The converter always emits {type: 'object', properties, required}, which
+  // matches Anthropic.Tool['input_schema'], but TS can't narrow Record<string,
+  // unknown> to that — so we cross the boundary with a single cast here.
+  const tools = toAnthropicTools() as unknown as Anthropic.Tool[];
 
-  const messages: AnthropicMessage[] = [
-    ...input.history.map((m) => ({ role: m.role, content: m.content })),
+  const messages: MessageParam[] = [
+    ...input.history.map(
+      (m): MessageParam => ({ role: m.role, content: m.content }),
+    ),
     { role: 'user', content: input.userMessage },
   ];
 
@@ -71,9 +67,12 @@ export async function runAgent(input: AgentInput): Promise<string> {
       { signal: input.context.signal },
     );
 
-    const blocks = response.content as ContentBlock[];
-    const toolUses = blocks.filter((b) => b.type === 'tool_use');
-    const textBlocks = blocks.filter((b) => b.type === 'text');
+    const toolUses = response.content.filter(
+      (b): b is ToolUseBlock => b.type === 'tool_use',
+    );
+    const textBlocks = response.content.filter(
+      (b): b is Anthropic.TextBlock => b.type === 'text',
+    );
 
     for (const t of textBlocks) {
       if (t.text) {
@@ -87,8 +86,13 @@ export async function runAgent(input: AgentInput): Promise<string> {
       return finalText;
     }
 
-    messages.push({ role: 'assistant', content: blocks });
-    const toolResults: ContentBlock[] = [];
+    // Echo the assistant's tool_use blocks back into the conversation,
+    // then append the tool_result blocks for the next round.
+    messages.push({
+      role: 'assistant',
+      content: response.content as ContentBlockParam[],
+    });
+    const toolResults: ContentBlockParam[] = [];
 
     for (const tu of toolUses) {
       if (input.context.signal.aborted) throw new Error('cancelled');
@@ -100,11 +104,11 @@ export async function runAgent(input: AgentInput): Promise<string> {
         });
         return finalText;
       }
-      const tool = getTool(tu.name ?? '');
+      const tool = getTool(tu.name);
       input.onStep({
         type: 'tool_call',
         toolName: tu.name as never,
-        detail: describeToolCall(tu.name ?? '', tu.input),
+        detail: describeToolCall(tu.name, tu.input),
         data: tu.input,
       });
 
@@ -114,7 +118,7 @@ export async function runAgent(input: AgentInput): Promise<string> {
         if (!tool) throw new Error(`Unknown tool: ${tu.name}`);
         if (tool.destructive) {
           const ok = await input.context.runtime.confirmDestructive(
-            describeToolCall(tu.name ?? '', tu.input),
+            describeToolCall(tu.name, tu.input),
           );
           if (!ok) throw new Error('User declined the destructive action.');
         }
@@ -130,11 +134,10 @@ export async function runAgent(input: AgentInput): Promise<string> {
       }
       toolResults.push({
         type: 'tool_result',
-        ...({ tool_use_id: tu.id, content: resultText, is_error: isError } as Record<
-          string,
-          unknown
-        >),
-      } as ContentBlock);
+        tool_use_id: tu.id,
+        content: resultText,
+        is_error: isError,
+      });
     }
 
     messages.push({ role: 'user', content: toolResults });

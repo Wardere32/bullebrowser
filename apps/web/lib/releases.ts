@@ -1,9 +1,15 @@
-// Server-side helper for fetching the latest GitHub Release. Cached at the
-// edge for 5 minutes to stay well under GitHub's anonymous rate limit.
+// Client-side helpers for the GitHub Releases API. The site is a static
+// export hosted on GitHub Pages, so there is no server runtime — the
+// browser fetches the latest release directly and the CDN/browser cache
+// keeps us well under GitHub's anonymous rate limit.
 
-import { product } from '@bullebrowser/brand-tokens';
-
-export type Platform = 'mac-arm64' | 'mac-x64' | 'win-x64' | 'win-arm64' | 'linux-x64' | 'linux-arm64';
+export type Platform =
+  | 'mac-arm64'
+  | 'mac-x64'
+  | 'win-x64'
+  | 'win-arm64'
+  | 'linux-x64'
+  | 'linux-arm64';
 
 export interface ReleaseAsset {
   name: string;
@@ -17,26 +23,19 @@ export interface LatestRelease {
   publishedAt: string;
   htmlUrl: string;
   assets: ReleaseAsset[];
-  // Convenience map of detected installers per platform.
   downloadFor: Partial<Record<Platform, ReleaseAsset>>;
   checksumsAsset?: ReleaseAsset;
 }
 
-const REPO_OWNER = 'wardere83';
-const REPO_NAME = 'bullebrowser';
+export const REPO_OWNER = 'wardere83';
+export const REPO_NAME = 'bullebrowser';
+export const RELEASES_PAGE = `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases`;
 
-export async function getLatestRelease(): Promise<LatestRelease | null> {
+export async function fetchLatestRelease(): Promise<LatestRelease | null> {
   try {
     const res = await fetch(
       `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest`,
-      {
-        headers: {
-          Accept: 'application/vnd.github+json',
-          'X-GitHub-Api-Version': '2022-11-28',
-          'User-Agent': `${product.name}-Web`,
-        },
-        next: { revalidate: 300 }, // 5 minutes
-      },
+      { headers: { Accept: 'application/vnd.github+json' } },
     );
     if (!res.ok) return null;
     const data = (await res.json()) as {
@@ -50,7 +49,7 @@ export async function getLatestRelease(): Promise<LatestRelease | null> {
         content_type: string;
       }>;
     };
-    const assets: ReleaseAsset[] = data.assets.map((a) => ({
+    const assets: ReleaseAsset[] = (data.assets ?? []).map((a) => ({
       name: a.name,
       browserDownloadUrl: a.browser_download_url,
       size: a.size,
@@ -85,8 +84,8 @@ function detectPlatformAssets(assets: ReleaseAsset[]): LatestRelease['downloadFo
 
 export function detectPlatform(userAgent: string): Platform {
   const ua = userAgent.toLowerCase();
-  if (ua.includes('mac')) return ua.includes('arm') ? 'mac-arm64' : 'mac-arm64';
-  if (ua.includes('windows')) return ua.includes('arm') ? 'win-arm64' : 'win-x64';
+  if (ua.includes('mac')) return 'mac-arm64';
+  if (ua.includes('win')) return ua.includes('arm') ? 'win-arm64' : 'win-x64';
   return 'linux-x64';
 }
 

@@ -1,6 +1,8 @@
 import type { MetadataRoute } from 'next';
 import { product } from '@bullebrowser/brand-tokens';
 
+export const dynamic = 'force-static';
+
 export default function sitemap(): MetadataRoute.Sitemap {
   const base = `https://${product.domain}`;
   const now = new Date();

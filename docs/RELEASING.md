@@ -17,20 +17,40 @@ Configure the following under **Settings → Secrets and variables → Actions**
 | `APPLE_TEAM_ID` | `build-desktop.yml` | 10-character Apple Developer Team ID |
 | `WINDOWS_CERTIFICATE` | `build-desktop.yml` | Base64 of the `.pfx` Authenticode signing certificate |
 | `WINDOWS_CERTIFICATE_PASSWORD` | `build-desktop.yml` | Password for the `.pfx` |
-| `VERCEL_TOKEN` | `deploy-web.yml` | Personal Vercel token with deploy rights |
-| `VERCEL_ORG_ID` | `deploy-web.yml` | From `vercel link` (`.vercel/project.json`) |
-| `VERCEL_PROJECT_ID` | `deploy-web.yml` | From `vercel link` (`.vercel/project.json`) |
 
-### Vercel and DNS for `bullebrowser.com`
+The landing page deploys to **GitHub Pages** — no third-party host and
+no secrets required.
 
-1. Run `pnpm dlx vercel link` inside `apps/web` once and select the
-   target Vercel project. This populates `.vercel/project.json`; copy
-   `orgId` and `projectId` into the repo secrets.
-2. Add `bullebrowser.com` and `www.bullebrowser.com` as production
-   domains for the project in the Vercel dashboard.
-3. At your domain registrar set:
-   - `bullebrowser.com` → `A 76.76.21.21` (Vercel apex)
-   - `www.bullebrowser.com` → `CNAME cname.vercel-dns.com`
+### Enable GitHub Pages (one-time)
+
+1. Go to **Settings → Pages**.
+2. Under **Build and deployment → Source**, choose **GitHub Actions**.
+3. Push to `main` (or run the `deploy-web` workflow manually). The
+   `deploy-web.yml` workflow builds the static export and publishes it.
+
+That alone makes the site live at the project URL:
+`https://wardere83.github.io/bullebrowser/`.
+
+### Custom domain `bullebrowser.com` (optional, free)
+
+The repo ships `apps/web/public/CNAME` pinned to `bullebrowser.com`, so
+the build is already configured for the apex domain. To activate it:
+
+1. At your domain registrar, add the GitHub Pages **apex A records**:
+   - `A  185.199.108.153`
+   - `A  185.199.109.153`
+   - `A  185.199.110.153`
+   - `A  185.199.111.153`
+   - (optionally the matching `AAAA` records for IPv6)
+   - `www.bullebrowser.com` → `CNAME wardere83.github.io`
+2. In **Settings → Pages → Custom domain**, enter `bullebrowser.com` and
+   tick **Enforce HTTPS** once the certificate is issued.
+
+To preview at the **project URL before DNS is ready**: delete
+`apps/web/public/CNAME` and set a repository variable
+`PAGES_BASE_PATH=/bullebrowser` (**Settings → Secrets and variables →
+Actions → Variables**). The workflow reads it and builds with that base
+path so assets resolve under `/bullebrowser/`.
 
 ## 1. Bump the version
 
@@ -71,9 +91,12 @@ The push to a `v*.*.*` tag triggers `build-desktop.yml`, which:
 ## 4. Deploy the web changes
 
 The `deploy-web.yml` workflow runs automatically on any push to `main`
-that touches `apps/web/**` or shared packages. The new release becomes
-visible on bullebrowser.com within 5 minutes (the latest-release fetch
-is cached for 5 minutes server-side).
+that touches `apps/web/**` or shared packages, building the static
+export and publishing it to GitHub Pages. The download page and the
+home-page download button fetch the latest release directly from the
+GitHub API in the visitor's browser, so a freshly published release
+shows up on the site as soon as the GitHub API reflects it (no rebuild
+of the site required).
 
 ## 5. Rollback
 

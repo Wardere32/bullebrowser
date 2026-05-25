@@ -23,9 +23,11 @@ export default function PrivacyPage() {
       <h2>Data {product.vendor} collects</h2>
       <p>None from the desktop app.</p>
       <p>
-        This website ({product.domain}) is hosted on Vercel and may receive
-        standard server access logs (IP, user agent, requested path) as
-        part of normal HTTP serving. We do not run any analytics scripts.
+        This website ({product.domain}) is a static site hosted on GitHub
+        Pages and may receive standard server access logs (IP, user agent,
+        requested path) as part of normal HTTP serving. The download page
+        also calls the public GitHub Releases API from your browser to
+        list the latest installers. We do not run any analytics scripts.
       </p>
 
       <h2>Data stored on your device</h2>

@@ -1,6 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { product } from '@bullebrowser/brand-tokens';
 
+export const dynamic = 'force-static';
 export const alt = product.name;
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';

@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from 'next/link';
 import { product } from '@bullebrowser/brand-tokens';
+import { asset } from '@/lib/asset';
 
 export function Header() {
   return (
@@ -8,10 +9,10 @@ export function Header() {
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
         <Link href="/" aria-label={product.name} className="flex items-center">
           <img
-            src="/wordmark.svg"
+            src={asset('/wordmark.png')}
             alt={product.name}
-            height={26}
-            className="h-[26px] w-auto select-none"
+            height={28}
+            className="h-7 w-auto select-none"
             draggable={false}
           />
         </Link>
