@@ -62,7 +62,10 @@ class TabManager {
     this.win.contentView.addChildView(view);
     this.wireEvents(tab);
     this.activate(id);
-    await view.webContents.loadURL(tab.url);
+    // Kick off the load but don't let a failed navigation (offline, bad
+    // cert, dead link) reject tab creation — the WebContents renders its
+    // own error page and did-fail-load clears the loading state.
+    void view.webContents.loadURL(tab.url).catch(() => {});
     this.broadcast();
     return this.toState(tab);
   }
@@ -105,7 +108,8 @@ class TabManager {
   async navigate(id: string, url: string): Promise<void> {
     const tab = this.find(id);
     if (!tab) return;
-    await tab.view.webContents.loadURL(url);
+    // Failed navigations show an error page in the view; don't reject.
+    await tab.view.webContents.loadURL(url).catch(() => {});
   }
 
   async reload(id: string): Promise<void> {
@@ -159,6 +163,14 @@ class TabManager {
     wc.on('did-stop-loading', () => {
       tab.loading = false;
       this.broadcast();
+    });
+    // ERR_ABORTED (-3) is normal (redirects, user navigation); ignore it.
+    // Real failures clear the spinner so the chrome doesn't hang on "Loading…".
+    wc.on('did-fail-load', (_e, errorCode, _desc, _url, isMainFrame) => {
+      if (isMainFrame && errorCode !== -3) {
+        tab.loading = false;
+        this.broadcast();
+      }
     });
     wc.on('page-title-updated', (_e, title) => {
       tab.title = title;
