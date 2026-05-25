@@ -7,6 +7,8 @@ directories:
   output: release
   buildResources: resources
 
+afterPack: ./scripts/after-pack.cjs
+
 files:
   - out/**/*
   - package.json
@@ -16,16 +18,17 @@ files:
   - "!**/{test,tests,__tests__,.vitest}/**"
   - "!**/{tsconfig.json,tsconfig.*.json,vitest.config.*,.eslintrc*,eslint.config.*}"
 
+asar: false
 asarUnpack:
   - resources/**
 
 mac:
   category: public.app-category.productivity
-  hardenedRuntime: true
+  hardenedRuntime: false
   gatekeeperAssess: false
-  entitlements: resources/entitlements.mac.plist
-  entitlementsInherit: resources/entitlements.mac.plist
-  notarize: false # set NOTARIZE_TOOL secrets in CI
+  identity: null
+  notarize: false
+  artifactName: "${productName}-${version}-${arch}.${ext}"
   target:
     - target: dmg
       arch:
@@ -36,6 +39,7 @@ mac:
         - x64
         - arm64
   icon: resources/icon.icns
+
 
 win:
   target:
@@ -54,20 +58,19 @@ nsis:
 
 linux:
   category: Network
+  artifactName: "${productName}-${version}-${arch}.${ext}"
+  maintainer: Bulle Consulting <hello@bulleconsulting.com>
   target:
     - target: AppImage
-      arch:
-        - x64
-        - arm64
-    - target: deb
       arch:
         - x64
         - arm64
   icon: resources/icon.png
   desktop:
     Name: BulleBrowser
-    Comment: The agentic browser for grants, RFPs, and compliance work
+    Comment: The agentic AI web browser
     Categories: Network;WebBrowser;
+
 
 publish:
   provider: github

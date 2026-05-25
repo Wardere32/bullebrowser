@@ -1,8 +1,8 @@
 // Wire up electron-updater to GitHub Releases. Disabled in dev.
 
 import { app } from 'electron';
-// electron-updater is CommonJS; under our ESM main process the named export
-// isn't available, so import the default and destructure.
+// electron-updater is CommonJS — import the default export and destructure
+// to avoid `Named export 'autoUpdater' not found` at runtime.
 import electronUpdater from 'electron-updater';
 const { autoUpdater } = electronUpdater;
 
