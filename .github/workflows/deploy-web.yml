@@ -43,15 +43,19 @@ jobs:
       - name: Type-check
         run: pnpm --filter @bullebrowser/web typecheck
 
-      # Build at the site root for the bullebrowser.com custom domain (the
-      # public/CNAME file pins it). To preview at the project Pages URL
-      # instead, delete public/CNAME and set NEXT_PUBLIC_BASE_PATH=/bullebrowser.
+      # Built at the site root for the bullebrowser.com custom domain, which
+      # apps/web/public/CNAME pins. (To preview at the project Pages URL before
+      # DNS is live, set repo variable PAGES_BASE_PATH=/bullebrowser.)
       - name: Build static export
         run: pnpm --filter @bullebrowser/web build
         env:
           NEXT_PUBLIC_BASE_PATH: ${{ vars.PAGES_BASE_PATH }}
 
+      # enablement: true turns GitHub Pages ON automatically (build type =
+      # GitHub Actions) if it isn't already — no manual Settings toggle.
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
