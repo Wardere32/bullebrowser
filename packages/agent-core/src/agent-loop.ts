@@ -2,7 +2,7 @@
 // dispatches tool calls into the desktop runtime via ToolContext, and
 // streams steps back to the renderer through onStep.
 
-import Anthropic from '@anthropic-ai/sdk';
+import type * as Anthropic from '@anthropic-ai/sdk';
 import {
   MAX_TOOL_CALLS_PER_TASK,
   type AgentStepHandler,
@@ -32,6 +32,7 @@ type ContentBlockParam = Anthropic.ContentBlockParam;
 type ToolUseBlock = Anthropic.ToolUseBlock;
 
 export async function runAgent(input: AgentInput): Promise<string> {
+  const { default: Anthropic } = await import('@anthropic-ai/sdk');
   const client = new Anthropic({ apiKey: input.apiKey });
   // The converter always emits {type: 'object', properties, required}, which
   // matches Anthropic.Tool['input_schema'], but TS can't narrow Record<string,

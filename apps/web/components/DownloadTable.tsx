@@ -11,6 +11,7 @@ import {
 } from '@/lib/releases';
 
 const PLATFORMS: { key: Platform; label: string; req: string }[] = [
+  { key: 'mac-universal', label: 'macOS · Universal (.dmg)', req: 'macOS 12 or newer' },
   { key: 'mac-arm64', label: 'macOS · Apple Silicon (.dmg)', req: 'macOS 12 or newer' },
   { key: 'mac-x64', label: 'macOS · Intel (.dmg)', req: 'macOS 12 or newer' },
   { key: 'win-x64', label: 'Windows 10/11 · x64 (.exe)', req: 'Windows 10 or newer' },
@@ -46,7 +47,12 @@ export function DownloadTable() {
                 }`
               : 'No public release has been published yet. '}
         {(dl?.apiUnavailable || noneYet) && (
-          <a href={RELEASES_PAGE} className="text-primary underline">
+          <a
+            href={RELEASES_PAGE}
+            className="text-primary underline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             Browse all releases on GitHub
           </a>
         )}
@@ -79,6 +85,8 @@ export function DownloadTable() {
                       <a
                         href={asset.browserDownloadUrl}
                         className="inline-block rounded bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-hover"
+                        target="_blank"
+                        rel="noopener noreferrer"
                       >
                         Download
                       </a>
@@ -102,7 +110,12 @@ export function DownloadTable() {
         <Link href="/install" className="text-primary underline">
           Installation &amp; first-launch guide
         </Link>
-        <a href={RELEASES_PAGE} className="text-primary underline">
+        <a
+          href={RELEASES_PAGE}
+          className="text-primary underline"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           Release history
         </a>
       </div>

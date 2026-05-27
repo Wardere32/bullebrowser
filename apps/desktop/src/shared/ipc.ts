@@ -68,16 +68,16 @@ export interface LayoutBounds {
 export interface AppSettings {
   defaultModel: ClaudeModelId;
   aiPanelOpen: boolean;
-  searchProvider: 'duckduckgo' | 'google' | 'bing';
+  searchProvider: 'bullebrowser' | 'google' | 'bing';
   homepageUrl: string;
   complianceChecklist: string[];
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
   defaultModel: 'claude-opus-4-7',
-  aiPanelOpen: false,
-  searchProvider: 'duckduckgo',
-  homepageUrl: 'https://duckduckgo.com',
+  aiPanelOpen: true,
+  searchProvider: 'bullebrowser',
+  homepageUrl: 'https://bullebrowser.com',
   complianceChecklist: [
     'EEO: Equal Employment Opportunity references and required language',
     'FERPA: Family Educational Rights and Privacy Act references',

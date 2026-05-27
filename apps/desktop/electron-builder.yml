@@ -24,20 +24,14 @@ asarUnpack:
 
 mac:
   category: public.app-category.productivity
-  hardenedRuntime: false
-  gatekeeperAssess: false
-  identity: null
-  notarize: false
+  hardenedRuntime: true
+  gatekeeperAssess: true
   artifactName: "${productName}-${version}-${arch}.${ext}"
+  arch:
+    - universal
   target:
-    - target: dmg
-      arch:
-        - x64
-        - arm64
-    - target: zip
-      arch:
-        - x64
-        - arm64
+    - dmg
+    - zip
   icon: resources/icon.icns
 
 

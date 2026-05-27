@@ -46,7 +46,6 @@ Full privacy policy: [bullebrowser.com/privacy](https://bullebrowser.com/privacy
 | Features | [bullebrowser.com/features](https://bullebrowser.com/features/) |
 | Download | [bullebrowser.com/download](https://bullebrowser.com/download/) |
 | Install & Setup | [bullebrowser.com/install](https://bullebrowser.com/install/) |
-| Preview | [bullebrowser.com/preview](https://bullebrowser.com/preview/) |
 | About | [bullebrowser.com/about](https://bullebrowser.com/about/) |
 | Privacy | [bullebrowser.com/privacy](https://bullebrowser.com/privacy/) |
 

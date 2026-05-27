@@ -14,6 +14,7 @@ export function SettingsModal() {
   const closeSettings = useBrowserStore((s) => s.closeSettings);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [hasKey, setHasKey] = useState(false);
+  const setSearchProvider = useBrowserStore((s) => s.setSearchProvider);
   const [keyDraft, setKeyDraft] = useState('');
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
@@ -37,6 +38,9 @@ export function SettingsModal() {
   const update = async (patch: Partial<AppSettings>) => {
     const next = await window.bullebrowser.settings.set(patch);
     setSettings(next);
+    if (next.searchProvider) {
+      setSearchProvider(next.searchProvider);
+    }
     setSavedAt(Date.now());
   };
 
@@ -134,7 +138,7 @@ export function SettingsModal() {
 
         <div>
           <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-secondary">
-            Search engine
+            Search behavior
           </h3>
           <select
             value={settings.searchProvider}
@@ -143,10 +147,13 @@ export function SettingsModal() {
             }
             className="mt-2 rounded border border-line px-2 py-1.5 text-sm"
           >
-            <option value="duckduckgo">DuckDuckGo</option>
+            <option value="bullebrowser">BulleBrowser</option>
             <option value="google">Google</option>
             <option value="bing">Bing</option>
           </select>
+          <p className="mt-2 text-xs text-ink-secondary">
+            When you type a query, BulleBrowser will keep you on the BulleBrowser experience.
+          </p>
         </div>
 
         <div>

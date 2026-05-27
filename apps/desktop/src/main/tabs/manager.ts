@@ -5,6 +5,11 @@ import { type BrowserWindow, WebContentsView } from 'electron';
 import { randomUUID } from 'node:crypto';
 import { IPC, type TabState, type LayoutBounds } from '../../shared/ipc.js';
 import { historyStore } from '../storage/history.js';
+import { getSettings } from '../storage/settings.js';
+
+function getDefaultHome(): string {
+  return getSettings().homepageUrl;
+}
 
 interface ManagedTab {
   id: string;
@@ -14,8 +19,6 @@ interface ManagedTab {
   loading: boolean;
   faviconUrl?: string;
 }
-
-const DEFAULT_HOME = 'https://duckduckgo.com';
 
 class TabManager {
   private win: BrowserWindow | null = null;
@@ -55,7 +58,7 @@ class TabManager {
       id,
       view,
       title: 'New Tab',
-      url: url ?? DEFAULT_HOME,
+      url: url ?? getDefaultHome(),
       loading: true,
     };
     this.tabs.push(tab);
