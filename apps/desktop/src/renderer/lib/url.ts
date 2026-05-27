@@ -4,7 +4,7 @@
 const URL_LIKE = /^[a-z0-9-]+(\.[a-z0-9-]+)+(\/.*)?$/i;
 const PROTOCOL = /^[a-z][a-z0-9+.-]*:\/\//i;
 
-export function parseAddressBarInput(raw: string, searchEngine = 'duckduckgo'): string {
+export function parseAddressBarInput(raw: string, searchEngine = 'bullebrowser'): string {
   const trimmed = raw.trim();
   if (!trimmed) return 'about:blank';
   if (PROTOCOL.test(trimmed)) return trimmed;
@@ -18,8 +18,8 @@ export function parseAddressBarInput(raw: string, searchEngine = 'duckduckgo'): 
       return `https://www.google.com/search?q=${query}`;
     case 'bing':
       return `https://www.bing.com/search?q=${query}`;
-    case 'duckduckgo':
+    case 'bullebrowser':
     default:
-      return `https://duckduckgo.com/?q=${query}`;
+      return 'https://bullebrowser.com';
   }
 }

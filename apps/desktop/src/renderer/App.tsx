@@ -16,6 +16,7 @@ export function App() {
   const aiPanelOpen = useBrowserStore((s) => s.aiPanelOpen);
   const setTabs = useBrowserStore((s) => s.setTabs);
   const setAiPanelOpen = useBrowserStore((s) => s.setAiPanelOpen);
+  const setSearchProvider = useBrowserStore((s) => s.setSearchProvider);
   const showSettings = useBrowserStore((s) => s.showSettings);
   const showAbout = useBrowserStore((s) => s.showAbout);
   const appendStep = useAgentStore((s) => s.appendStep);
@@ -33,6 +34,7 @@ export function App() {
     (async () => {
       const settings = await window.bullebrowser.settings.get();
       setAiPanelOpen(settings.aiPanelOpen);
+      setSearchProvider(settings.searchProvider);
       const list = await window.bullebrowser.tabs.list();
       if (list.length === 0) {
         await window.bullebrowser.tabs.create();
@@ -40,7 +42,7 @@ export function App() {
         setTabs(list);
       }
     })();
-  }, [setAiPanelOpen, setTabs]);
+  }, [setAiPanelOpen, setTabs, setSearchProvider]);
 
   // Subscribe to tab updates.
   useEffect(() => {

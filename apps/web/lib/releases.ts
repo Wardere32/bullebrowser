@@ -5,6 +5,7 @@
 // most recent releases and pick, per platform, the newest asset available.
 
 export type Platform =
+  | 'mac-universal'
   | 'mac-arm64'
   | 'mac-x64'
   | 'win-x64'
@@ -32,8 +33,12 @@ export interface Downloads {
   apiUnavailable: boolean;
 }
 
-export const REPO_OWNER = 'wardere83';
-export const REPO_NAME = 'bullebrowser';
+export const REPO_OWNER =
+  (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_REPO_OWNER) ||
+  'wardere83';
+export const REPO_NAME =
+  (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_REPO_NAME) ||
+  'bullebrowser';
 export const RELEASES_PAGE = `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases`;
 
 interface RawAsset {
@@ -51,7 +56,10 @@ interface RawRelease {
 
 function classify(name: string): Platform | null {
   const n = name.toLowerCase();
-  if (n.endsWith('.dmg')) return n.includes('arm64') ? 'mac-arm64' : 'mac-x64';
+  if (n.endsWith('.dmg') || n.endsWith('.zip')) {
+    if (n.includes('universal')) return 'mac-universal';
+    return n.includes('arm64') ? 'mac-arm64' : 'mac-x64';
+  }
   if (n.endsWith('.exe')) return n.includes('arm64') ? 'win-arm64' : 'win-x64';
   if (n.endsWith('.appimage')) return n.includes('arm64') ? 'linux-arm64' : 'linux-x64';
   return null;

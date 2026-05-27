@@ -18,6 +18,7 @@ import {
 } from '@/lib/releases';
 
 const LABEL: Record<Platform, string> = {
+  'mac-universal': 'Download for macOS · Universal',
   'mac-arm64': 'Download for macOS · Apple Silicon',
   'mac-x64': 'Download for macOS · Intel',
   'win-x64': 'Download for Windows',
@@ -40,17 +41,21 @@ export function DownloadButton({ size = 'lg' }: { size?: 'lg' | 'md' }) {
       .finally(() => setLoaded(true));
   }, []);
 
+  const effectivePlatform: Platform =
+    platformFamily(platform) === 'mac' && dl?.forPlatform?.['mac-universal']
+      ? 'mac-universal'
+      : platform;
+
+  const primary = dl?.forPlatform?.[effectivePlatform];
+  const macAlt =
+    platformFamily(platform) === 'mac' && effectivePlatform !== 'mac-universal'
+      ? dl?.forPlatform?.[platform === 'mac-arm64' ? 'mac-x64' : 'mac-arm64']
+      : undefined;
+
   const cls =
     size === 'lg'
       ? 'inline-flex items-center justify-center rounded-md bg-primary px-5 py-3 text-base font-semibold text-white shadow-sm transition-colors hover:bg-primary-hover'
       : 'inline-flex items-center justify-center rounded-md bg-primary px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover';
-
-  const primary = dl?.forPlatform?.[platform];
-  // On Mac, offer the other arch too since UA can't distinguish them.
-  const macAlt =
-    platformFamily(platform) === 'mac'
-      ? dl?.forPlatform?.[platform === 'mac-arm64' ? 'mac-x64' : 'mac-arm64']
-      : undefined;
 
   if (mobile) {
     return (
@@ -69,15 +74,15 @@ export function DownloadButton({ size = 'lg' }: { size?: 'lg' | 'md' }) {
   if (primary) {
     return (
       <div className="flex flex-col items-start gap-1.5">
-        <a href={primary.browserDownloadUrl} className={cls}>
-          {LABEL[platform]}
+        <a href={primary.browserDownloadUrl} className={cls} target="_blank" rel="noopener noreferrer">
+          {LABEL[effectivePlatform]}
         </a>
         <div className="text-xs text-ink-secondary">
           {primary.tag} · {formatBytes(primary.size)}
           {macAlt && (
             <>
               {' · '}
-              <a href={macAlt.browserDownloadUrl} className="underline">
+              <a href={macAlt.browserDownloadUrl} className="underline" target="_blank" rel="noopener noreferrer">
                 {platform === 'mac-arm64' ? 'Intel Mac' : 'Apple Silicon'}
               </a>
             </>
@@ -98,7 +103,7 @@ export function DownloadButton({ size = 'lg' }: { size?: 'lg' | 'md' }) {
   // No matching asset / API issue: always give a working path forward.
   return (
     <div className="flex flex-col items-start gap-1.5">
-      <a href={RELEASES_PAGE} className={cls}>
+      <a href={RELEASES_PAGE} className={cls} target="_blank" rel="noopener noreferrer">
         Download BulleBrowser
       </a>
       <div className="text-xs text-ink-secondary">
@@ -107,7 +112,7 @@ export function DownloadButton({ size = 'lg' }: { size?: 'lg' | 'md' }) {
           : loaded && !dl?.latestTag
             ? 'Preparing the first public release — '
             : ''}
-        <a href={RELEASES_PAGE} className="underline">
+        <a href={RELEASES_PAGE} className="underline" target="_blank" rel="noopener noreferrer">
           all releases on GitHub
         </a>
         {' · '}

@@ -73,7 +73,7 @@ jobs:
 
       # macOS code signing + notarization
       - name: Import Apple certificate (macOS)
-        if: matrix.target == 'mac' && env.MACOS_CERTIFICATE != ''
+        if: matrix.target == 'mac' && secrets.MACOS_CERTIFICATE != ''
         env:
           MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
           MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
@@ -86,6 +86,21 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" build.keychain
           rm certificate.p12
 
+      - name: Verify macOS signing and notarization secrets
+        if: matrix.target == 'mac'
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$MACOS_CERTIFICATE" ] || [ -z "$MACOS_CERTIFICATE_PASSWORD" ] || [ -z "$APPLE_ID" ] || [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] || [ -z "$APPLE_TEAM_ID" ]; then
+            echo "ERROR: macOS signing or notarization secrets are missing."
+            echo "Set MACOS_CERTIFICATE, MACOS_CERTIFICATE_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, and APPLE_TEAM_ID in GitHub Actions secrets."
+            exit 1
+          fi
+
       - name: Build & sign macOS installer
         if: matrix.target == 'mac'
         env:
@@ -95,32 +110,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_KEYCHAIN: build.keychain
         run: pnpm --filter @bullebrowser/desktop package:mac
-
-      - name: Ad-hoc codesign macOS app + dmg
-        if: matrix.target == 'mac'
-        run: |
-          set -e
-          cd apps/desktop/release
-          # Re-sign every .app inside each unpacked output, then re-sign each .dmg.
-          # Without ANY signature (or with broken hardened runtime), macOS shows
-          # "BulleBrowser is damaged". Ad-hoc sign turns that into a normal
-          # "unidentified developer" prompt that users can bypass.
-          for D in mac mac-arm64; do
-            APP="$D/BulleBrowser.app"
-            if [ -d "$APP" ]; then
-              echo "Ad-hoc signing $APP"
-              codesign --force --deep --sign - "$APP" || true
-            fi
-          done
-          for F in *.dmg; do
-            if [ -f "$F" ]; then
-              echo "Ad-hoc signing $F"
-              codesign --force --sign - "$F" || true
-            fi
-          done
-          # Also strip the quarantine xattr from artifacts we publish so users
-          # who download via Terminal/curl get a clean install.
-          xattr -cr . 2>/dev/null || true
 
 
       - name: Build & sign Windows installer

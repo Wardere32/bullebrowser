@@ -16,6 +16,8 @@ Configure the following under **Settings → Secrets and variables → Actions**
 | `APPLE_APP_SPECIFIC_PASSWORD` | `build-desktop.yml` | App-specific password generated at appleid.apple.com |
 | `APPLE_TEAM_ID` | `build-desktop.yml` | 10-character Apple Developer Team ID |
 | `WINDOWS_CERTIFICATE` | `build-desktop.yml` | Base64 of the `.pfx` Authenticode signing certificate |
+
+> Important: macOS releases must be signed and notarized with a valid Apple Developer certificate and Apple ID to avoid Gatekeeper warnings. The build workflow now fails if any of the macOS signing/notarization secrets are missing, so unsigned DMGs will not be published.
 | `WINDOWS_CERTIFICATE_PASSWORD` | `build-desktop.yml` | Password for the `.pfx` |
 
 The landing page deploys to **GitHub Pages** — no third-party host and

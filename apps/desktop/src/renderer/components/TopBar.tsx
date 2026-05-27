@@ -13,6 +13,7 @@ export function TopBar() {
   const currentStep = useAgentStore((s) => s.currentStep);
   const status = useAgentStore((s) => s.status);
   const runId = useAgentStore((s) => s.runId);
+  const searchProvider = useBrowserStore((s) => s.searchProvider);
   const [draftUrl, setDraftUrl] = useState('');
   const [profileOpen, setProfileOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -30,7 +31,7 @@ export function TopBar() {
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!active) return;
-    const url = parseAddressBarInput(draftUrl);
+    const url = parseAddressBarInput(draftUrl, searchProvider);
     void window.bullebrowser.tabs.navigate(active.id, url);
   };
 

@@ -14,8 +14,7 @@ background needed.
 
 | Your computer | File to download |
 |---------------|------------------|
-| Mac (Apple Silicon — M1/M2/M3/M4) | `BulleBrowser-<version>-arm64.dmg` |
-| Mac (Intel) | `BulleBrowser-<version>-x64.dmg` |
+| Mac | `BulleBrowser-<version>-universal.dmg` |
 | Windows 10/11 | `BulleBrowser-Setup-<version>-x64.exe` |
 | Windows on ARM | `BulleBrowser-Setup-<version>-arm64.exe` |
 | Linux (most PCs) | `BulleBrowser-<version>-x86_64.AppImage` |

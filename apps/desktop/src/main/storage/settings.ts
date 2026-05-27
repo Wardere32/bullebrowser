@@ -7,11 +7,32 @@ const store = createStore<AppSettings & Record<string, unknown>>(
 );
 
 export function getSettings(): AppSettings {
+  const storedSearchProvider = store.get('searchProvider') as string | undefined;
+  const storedHomepageUrl = store.get('homepageUrl') as string | undefined;
+
+  const allowedSearchProviders: AppSettings['searchProvider'][] = [
+    'bullebrowser',
+    'google',
+    'bing',
+  ];
+
+  const resolvedSearchProvider = allowedSearchProviders.includes(
+    storedSearchProvider as AppSettings['searchProvider'],
+  )
+    ? (storedSearchProvider as AppSettings['searchProvider'])
+    : DEFAULT_SETTINGS.searchProvider;
+
+  const normalizedHomepageUrl =
+    storedHomepageUrl === 'https://bullebrowser.com/preview' ||
+    !storedHomepageUrl?.trim()
+      ? DEFAULT_SETTINGS.homepageUrl
+      : storedHomepageUrl;
+
   return {
     defaultModel: store.get('defaultModel'),
     aiPanelOpen: store.get('aiPanelOpen'),
-    searchProvider: store.get('searchProvider'),
-    homepageUrl: store.get('homepageUrl'),
+    searchProvider: resolvedSearchProvider,
+    homepageUrl: normalizedHomepageUrl ?? DEFAULT_SETTINGS.homepageUrl,
     complianceChecklist: store.get('complianceChecklist'),
   };
 }
