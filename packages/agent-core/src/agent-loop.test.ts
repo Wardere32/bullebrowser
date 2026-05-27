@@ -70,13 +70,15 @@ describe('runAgent', () => {
     expect(result).toBe('All done.');
     expect(create).toHaveBeenCalledTimes(2);
 
-    const secondCall = create.mock.calls[1][0];
+    const secondCall = create.mock.calls[1]![0];
     const userMessages = secondCall.messages.filter((msg: any) => msg.role === 'user');
     const lastUserMessage = userMessages[userMessages.length - 1];
+    // The Anthropic API requires tool_result.content to be a string (or
+    // content blocks), so structured tool output is JSON-stringified.
     expect(lastUserMessage.content[0]).toMatchObject({
       type: 'tool_result',
       tool_use_id: 'tool-use-1',
-      content: { url: 'https://example.com', title: 'Example' },
+      content: JSON.stringify({ url: 'https://example.com', title: 'Example' }),
     });
 
     expect(steps.some((step) => (step as any).type === 'tool_call')).toBe(true);

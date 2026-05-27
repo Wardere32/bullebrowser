@@ -2,7 +2,11 @@
 // dispatches tool calls into the desktop runtime via ToolContext, and
 // streams steps back to the renderer through onStep.
 
-import type * as Anthropic from '@anthropic-ai/sdk';
+// Type-only default import: `Anthropic.MessageParam`, `Anthropic.Tool`, etc.
+// are members of the default export's merged namespace, not top-level module
+// exports — so `import type * as` would not resolve them. `import type` keeps
+// this erased at runtime; the SDK value is loaded dynamically inside runAgent.
+import type Anthropic from '@anthropic-ai/sdk';
 import {
   MAX_TOOL_CALLS_PER_TASK,
   type AgentStepHandler,
@@ -32,8 +36,8 @@ type ContentBlockParam = Anthropic.ContentBlockParam;
 type ToolUseBlock = Anthropic.ToolUseBlock;
 
 export async function runAgent(input: AgentInput): Promise<string> {
-  const { default: Anthropic } = await import('@anthropic-ai/sdk');
-  const client = new Anthropic({ apiKey: input.apiKey });
+  const { default: AnthropicClient } = await import('@anthropic-ai/sdk');
+  const client = new AnthropicClient({ apiKey: input.apiKey });
   // The converter always emits {type: 'object', properties, required}, which
   // matches Anthropic.Tool['input_schema'], but TS can't narrow Record<string,
   // unknown> to that — so we cross the boundary with a single cast here.
@@ -136,7 +140,7 @@ export async function runAgent(input: AgentInput): Promise<string> {
       toolResults.push({
         type: 'tool_result',
         tool_use_id: tu.id,
-        content: resultContent,
+        content: toToolResultContent(resultContent),
         is_error: isError,
       });
     }
@@ -146,6 +150,36 @@ export async function runAgent(input: AgentInput): Promise<string> {
 
   input.onStep({ type: 'done' });
   return finalText;
+}
+
+/**
+ * Shape a tool's return value into what the Anthropic API accepts for
+ * `tool_result.content`: a string or an array of content blocks — never a
+ * bare object. Screenshots are returned as an image block so the model can
+ * actually see them; everything else is JSON-stringified.
+ */
+function toToolResultContent(
+  value: unknown,
+): string | Array<Anthropic.TextBlockParam | Anthropic.ImageBlockParam> {
+  if (typeof value === 'string') return value;
+  if (
+    value !== null &&
+    typeof value === 'object' &&
+    'pngBase64' in value &&
+    typeof (value as { pngBase64: unknown }).pngBase64 === 'string'
+  ) {
+    return [
+      {
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: 'image/png',
+          data: (value as { pngBase64: string }).pngBase64,
+        },
+      },
+    ];
+  }
+  return JSON.stringify(value);
 }
 
 function describeToolCall(name: string, input: unknown): string {
