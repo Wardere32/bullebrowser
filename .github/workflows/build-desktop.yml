@@ -86,7 +86,10 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" build.keychain
           rm certificate.p12
 
-      - name: Verify macOS signing and notarization secrets
+      # Don't hard-fail when signing secrets are absent — fall back to the
+      # ad-hoc signature from afterPack so a Mac asset is always produced.
+      # When the secrets ARE set, the import + package steps notarize normally.
+      - name: Check macOS signing and notarization secrets
         if: matrix.target == 'mac'
         env:
           MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
@@ -96,9 +99,9 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           if [ -z "$MACOS_CERTIFICATE" ] || [ -z "$MACOS_CERTIFICATE_PASSWORD" ] || [ -z "$APPLE_ID" ] || [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] || [ -z "$APPLE_TEAM_ID" ]; then
-            echo "ERROR: macOS signing or notarization secrets are missing."
-            echo "Set MACOS_CERTIFICATE, MACOS_CERTIFICATE_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, and APPLE_TEAM_ID in GitHub Actions secrets."
-            exit 1
+            echo "::warning::macOS signing/notarization secrets are missing — building an ad-hoc-signed, un-notarized app. Gatekeeper will require users to right-click → Open. Set MACOS_CERTIFICATE, MACOS_CERTIFICATE_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, and APPLE_TEAM_ID to ship a notarized build."
+          else
+            echo "macOS signing and notarization secrets present — will sign and notarize."
           fi
 
       - name: Build & sign macOS installer
