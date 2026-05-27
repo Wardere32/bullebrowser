@@ -112,7 +112,7 @@ export async function runAgent(input: AgentInput): Promise<string> {
         data: tu.input,
       });
 
-      let resultText: string;
+      let resultContent: unknown;
       let isError = false;
       try {
         if (!tool) throw new Error(`Unknown tool: ${tu.name}`);
@@ -124,18 +124,18 @@ export async function runAgent(input: AgentInput): Promise<string> {
         }
         const parsed = tool.inputSchema.parse(tu.input ?? {});
         const out = await tool.execute(parsed, input.context);
-        resultText = JSON.stringify(out);
+        resultContent = out;
         input.onStep({ type: 'tool_result', toolName: tu.name as never, data: out });
       } catch (err) {
         isError = true;
-        resultText =
+        resultContent =
           err instanceof Error ? err.message : 'Unknown error executing tool';
-        input.onStep({ type: 'error', toolName: tu.name as never, detail: resultText });
+        input.onStep({ type: 'error', toolName: tu.name as never, detail: String(resultContent) });
       }
       toolResults.push({
         type: 'tool_result',
         tool_use_id: tu.id,
-        content: resultText,
+        content: resultContent,
         is_error: isError,
       });
     }
