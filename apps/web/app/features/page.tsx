@@ -97,7 +97,7 @@ export default function FeaturesPage() {
       </Section>
 
       {/* Skills */}
-      <Section eyebrow="Preset skills" title="Built for grants, RFPs, and compliance.">
+      <Section eyebrow="Three agentic skills" title="Native intelligence, built for grants, RFPs, and compliance.">
         <div className="grid gap-10 md:grid-cols-3">
           {SKILLS.map((s) => (
             <div key={s.title}>

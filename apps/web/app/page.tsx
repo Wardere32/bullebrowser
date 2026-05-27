@@ -4,9 +4,21 @@ import { DownloadButton } from '@/components/DownloadButton';
 import { AgentDemo } from '@/components/AgentDemo';
 
 const SKILLS = [
-  { title: 'Grant scanner', body: 'Open opportunities from SAM.gov and Grants.gov, sorted by deadline.' },
-  { title: 'RFP comparator', body: 'Two to four RFPs, broken down side by side in one pass.' },
-  { title: 'Compliance review', body: 'Clauses flagged against EEO, FERPA, and ADA — quoted and sourced.' },
+  {
+    title: 'Grant scanner',
+    lede: 'Scan funding without the tab-juggling.',
+    body: 'Searches SAM.gov and Grants.gov, follows each listing into its detail page, and returns a table sorted by deadline — award ceilings and links included.',
+  },
+  {
+    title: 'RFP comparator',
+    lede: 'Go / no-go in minutes.',
+    body: 'Paste 2–4 RFP links. It reads each end to end and lays deadline, scope, eligibility, contract value, and evaluation criteria side by side.',
+  },
+  {
+    title: 'Compliance review',
+    lede: 'Catch the gaps before review does.',
+    body: 'Flags clauses against EEO, FERPA, and ADA — plus any checklist items you add — and quotes each one with its section reference.',
+  },
 ];
 
 export default function HomePage() {
@@ -38,15 +50,24 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* What it does — three crisp lines */}
+      {/* Three agentic skills — the heart of BulleBrowser */}
       <section className="mx-auto max-w-6xl px-6 py-24 md:py-32">
-        <h2 className="max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
-          One prompt replaces an afternoon of tabs.
+        <div className="text-xs font-semibold uppercase tracking-widest text-primary">
+          Three agentic skills
+        </div>
+        <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
+          Native intelligence, built into the browser.
         </h2>
+        <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-ink-secondary">
+          Not a chatbot bolted onto a sidebar. {product.name} is purpose-built
+          for the grant, RFP, and compliance work {product.vendor} does every
+          day — and one prompt replaces an afternoon of tabs.
+        </p>
         <div className="mt-14 grid gap-x-12 gap-y-10 sm:grid-cols-3">
           {SKILLS.map((s) => (
             <div key={s.title}>
               <h3 className="text-lg font-semibold">{s.title}</h3>
+              <p className="mt-1 text-[15px] font-medium text-ink-primary">{s.lede}</p>
               <p className="mt-2 text-[15px] leading-relaxed text-ink-secondary">{s.body}</p>
             </div>
           ))}
@@ -65,8 +86,9 @@ export default function HomePage() {
             Your data stays yours.
           </h2>
           <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-ink-secondary">
-            Bring your own key. Prompts go straight to your provider — never to{' '}
-            {product.vendor}. No telemetry.
+            Bring your own key. Prompts go straight to Anthropic on your own
+            account — never to {product.vendor}. History and conversations stay
+            on your device. No telemetry.
           </p>
           <div className="mt-10 flex justify-center">
             <DownloadButton />
