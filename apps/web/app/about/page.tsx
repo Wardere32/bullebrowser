@@ -16,7 +16,9 @@ export default function AboutPage() {
         and government agencies, and grants compliance work. We&apos;ve
         spent the last decade reading RFPs, scanning notices of funding
         opportunity, and writing compliance memoranda — and we built{' '}
-        {product.name} for the work we do every day.
+        {product.name} for the work we do every day. Its flagship skills —
+        grant scanning, RFP comparison, and compliance review — cover the jobs
+        we run most often, and the agent takes on the rest on request.
       </p>
 
       <h2>Why a browser?</h2>

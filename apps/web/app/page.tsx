@@ -37,7 +37,8 @@ export default function HomePage() {
             </h1>
             <p className="mt-6 max-w-md text-lg leading-relaxed text-ink-inverse/70">
               An AI agent that researches grants, compares RFPs, and reviews
-              compliance — right inside your browser.
+              compliance — and works whatever else you ask, right inside your
+              browser.
             </p>
             <div className="mt-10 flex flex-wrap items-center gap-5">
               <DownloadButton />

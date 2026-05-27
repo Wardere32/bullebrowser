@@ -15,7 +15,7 @@ const SHOTS = [
     src: '/screenshots/first-open.png',
     title: 'First launch',
     caption:
-      'A fresh tab on the start page with the AI panel open — the welcome state introduces the three preset skills, and the composer is ready for your first task.',
+      'A fresh tab on the start page with the AI panel open — the welcome state introduces the three flagship skills, and the composer is ready for any task you type.',
   },
   {
     src: '/screenshots/grant-scanner.png',
