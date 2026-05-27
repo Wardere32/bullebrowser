@@ -43,16 +43,13 @@ jobs:
       - name: Type-check
         run: pnpm --filter @bullebrowser/web typecheck
 
-      # Served at the GitHub Pages PROJECT URL
-      # (https://wardere83.github.io/bullebrowser/) so it's viewable without
-      # any custom-domain redirect or DNS. The base path makes asset/link URLs
-      # resolve under /bullebrowser. To move to bullebrowser.com later: restore
-      # apps/web/public/CNAME, set this to '', and point the domain's DNS at
-      # GitHub Pages.
+      # Served at the custom domain bullebrowser.com — apps/web/public/CNAME
+      # carries the domain into the published artifact and the DNS is pointed
+      # at GitHub Pages, so assets/links resolve at the domain root (no base
+      # path). To revert to the project URL (wardere83.github.io/bullebrowser),
+      # remove the CNAME and set NEXT_PUBLIC_BASE_PATH=/bullebrowser here.
       - name: Build static export
         run: pnpm --filter @bullebrowser/web build
-        env:
-          NEXT_PUBLIC_BASE_PATH: /bullebrowser
 
       # enablement: true turns GitHub Pages ON automatically (build type =
       # GitHub Actions) if it isn't already — no manual Settings toggle.
