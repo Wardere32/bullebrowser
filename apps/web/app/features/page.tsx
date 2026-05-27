@@ -97,7 +97,7 @@ export default function FeaturesPage() {
       </Section>
 
       {/* Skills */}
-      <Section eyebrow="Three agentic skills" title="Native intelligence, built for grants, RFPs, and compliance.">
+      <Section eyebrow="Agentic skills" title="Three flagship skills — and a general agent for the rest.">
         <div className="grid gap-10 md:grid-cols-3">
           {SKILLS.map((s) => (
             <div key={s.title}>
@@ -107,6 +107,11 @@ export default function FeaturesPage() {
             </div>
           ))}
         </div>
+        <p className="mt-10 max-w-2xl text-[15px] leading-relaxed text-ink-secondary">
+          These three lead the way — among many other tasks the agent will take
+          on. Pick a preset for a guided workflow, or just describe what you
+          need in plain language and it works the live tab.
+        </p>
       </Section>
 
       {/* Control & trust */}

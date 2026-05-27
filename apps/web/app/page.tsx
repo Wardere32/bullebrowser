@@ -53,7 +53,7 @@ export default function HomePage() {
       {/* Three agentic skills — the heart of BulleBrowser */}
       <section className="mx-auto max-w-6xl px-6 py-24 md:py-32">
         <div className="text-xs font-semibold uppercase tracking-widest text-primary">
-          Three agentic skills
+          Agentic skills
         </div>
         <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
           Native intelligence, built into the browser.
@@ -61,7 +61,8 @@ export default function HomePage() {
         <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-ink-secondary">
           Not a chatbot bolted onto a sidebar. {product.name} is purpose-built
           for the grant, RFP, and compliance work {product.vendor} does every
-          day — and one prompt replaces an afternoon of tabs.
+          day. Three flagship skills lead the way — and the agent takes on much
+          more on request.
         </p>
         <div className="mt-14 grid gap-x-12 gap-y-10 sm:grid-cols-3">
           {SKILLS.map((s) => (
@@ -72,6 +73,11 @@ export default function HomePage() {
             </div>
           ))}
         </div>
+        <p className="mt-10 max-w-2xl text-[15px] leading-relaxed text-ink-secondary">
+          These three lead the way — among many other tasks the agent will take
+          on. Pick a preset for a guided run, or just describe what you need in
+          plain language and it works the live tab for you.
+        </p>
         <div className="mt-12">
           <Link href="/features" className="text-sm font-medium text-primary underline-offset-4 hover:underline">
             Explore the features →
