@@ -111,17 +111,26 @@ export class DesktopToolRuntime implements ToolRuntime {
     }
     if (condition.networkIdle) {
       await new Promise<void>((resolve) => {
-        const t = setTimeout(resolve, timeout);
-        const onIdle = () => {
-          clearTimeout(t);
-          resolve();
-        };
-        // Approximate "network idle": no in-flight requests for 500ms.
+        let settled = false;
         let inFlight = 0;
         let idleTimer: NodeJS.Timeout | null = null;
+        const wr = wc.session.webRequest;
+
+        const cleanup = () => {
+          if (settled) return;
+          settled = true;
+          if (idleTimer) clearTimeout(idleTimer);
+          clearTimeout(timeoutTimer);
+          // Pass null to detach the handlers; otherwise they leak on the
+          // session and intercept every subsequent request forever.
+          wr.onBeforeRequest(null);
+          wr.onCompleted(null);
+          wr.onErrorOccurred(null);
+          resolve();
+        };
         const armIdle = () => {
           if (idleTimer) clearTimeout(idleTimer);
-          idleTimer = setTimeout(onIdle, 500);
+          idleTimer = setTimeout(cleanup, 500);
         };
         const onStart = () => {
           inFlight += 1;
@@ -131,12 +140,15 @@ export class DesktopToolRuntime implements ToolRuntime {
           inFlight = Math.max(0, inFlight - 1);
           if (inFlight === 0) armIdle();
         };
-        wc.session.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, (_d, cb) => {
+
+        // Hard cap so we always clean up even if the page never goes idle.
+        const timeoutTimer = setTimeout(cleanup, timeout);
+        wr.onBeforeRequest({ urls: ['<all_urls>'] }, (_d, cb) => {
           onStart();
           cb({});
         });
-        wc.session.webRequest.onCompleted({ urls: ['<all_urls>'] }, () => onEnd());
-        wc.session.webRequest.onErrorOccurred({ urls: ['<all_urls>'] }, () => onEnd());
+        wr.onCompleted({ urls: ['<all_urls>'] }, () => onEnd());
+        wr.onErrorOccurred({ urls: ['<all_urls>'] }, () => onEnd());
         armIdle();
       });
       return { matched: true };
