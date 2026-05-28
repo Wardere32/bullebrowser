@@ -15,6 +15,7 @@ interface AgentStoreState {
   pendingConfirm: { id: string; runId: string; message: string } | null;
   setConversations: (c: ConversationSummary[]) => void;
   setCurrent: (c: ConversationDetail | null) => void;
+  refreshCurrent: (c: ConversationDetail) => void;
   startRun: (runId: string) => void;
   appendStep: (s: AgentStepEvent) => void;
   finishRun: () => void;
@@ -49,5 +50,9 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
   // An error means the run is over too — clear runId so the chrome
   // doesn't keep a stale handle on the failed run.
   setError: (msg) => set({ status: 'error', currentStep: msg, runId: null }),
+  // Refresh the current conversation in place — used when a run finishes
+  // and we want to pull in the assistant's saved reply without resetting
+  // the step feed / status the way setCurrent does.
+  refreshCurrent: (current) => set({ current }),
   setPendingConfirm: (pendingConfirm) => set({ pendingConfirm }),
 }));
