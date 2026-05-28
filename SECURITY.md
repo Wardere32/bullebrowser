@@ -64,10 +64,13 @@ run analytics or third-party trackers.
   25-tool-call cap per task, an always-available Stop button, and
   explicit confirmation prompts for destructive actions.
 - **Website:** static export served by GitHub Pages over HTTPS
-  (Let's Encrypt). Content-Security-Policy, `Permissions-Policy`,
-  `X-Content-Type-Options: nosniff`, and `Referrer-Policy:
-  strict-origin-when-cross-origin` are set via meta headers. External
-  links carry `rel="noopener noreferrer"`.
+  (Let's Encrypt). A strict **Content-Security-Policy** is enforced via
+  `<meta http-equiv>`, and **Referrer-Policy:
+  strict-origin-when-cross-origin** is set via `<meta name="referrer">`.
+  GitHub Pages can't emit arbitrary HTTP response headers, so
+  HTTP-header-only protections (HSTS, `X-Content-Type-Options`,
+  `Permissions-Policy`, `X-Frame-Options`) would need a CDN proxy in
+  front to take effect. External links carry `rel="noopener noreferrer"`.
 - **Repository:** GitHub Dependabot alerts, Dependabot security
   updates, secret scanning, and CodeQL are enabled (or recommended) on
   the public repository.
