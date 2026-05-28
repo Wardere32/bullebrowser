@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { skills } from '@bullebrowser/agent-core';
 import type { ClaudeModelId } from '@bullebrowser/agent-core';
 import { useAgentStore } from '../state/agent-store.js';
 import { useBrowserStore } from '../state/browser-store.js';
+import { AGENT_PROMPT_EVENT } from '../lib/url.js';
 import type { AppSettings } from '../../shared/ipc.js';
 import type { AgentStepEvent } from '../../shared/agent-events.js';
 
@@ -55,10 +56,9 @@ export function AiPanel() {
     })();
   }, [showSettings]);
 
-  const send = async () => {
-    if (!draft.trim() || !current) return;
-    const message = draft.trim();
-    setDraft('');
+  const sendMessage = async (text: string) => {
+    const message = text.trim();
+    if (!message || !current || !hasKey) return;
     setCurrent({
       ...current,
       messages: [
@@ -76,12 +76,47 @@ export function AiPanel() {
     startRun(runId);
   };
 
+  const send = async () => {
+    if (!draft.trim()) return;
+    const t = draft.trim();
+    setDraft('');
+    await sendMessage(t);
+  };
+
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       void send();
     }
   };
+
+  // Listen for address-bar agent prompts. The user typed a task into the
+  // top-bar address field with the BulleBrowser search engine selected;
+  // TopBar dispatched the event and we send it as the next agent message.
+  // If we aren't hydrated yet (no current conversation), queue the prompt
+  // and flush it once `current` is ready.
+  const queuedPrompt = useRef<string | null>(null);
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const text = (e as CustomEvent<string>).detail;
+      if (!text) return;
+      if (current && hasKey) void sendMessage(text);
+      else queuedPrompt.current = text;
+    };
+    window.addEventListener(AGENT_PROMPT_EVENT, handler);
+    return () => window.removeEventListener(AGENT_PROMPT_EVENT, handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current, hasKey]);
+
+  // Flush any queued address-bar prompt once we're ready.
+  useEffect(() => {
+    if (current && hasKey && queuedPrompt.current) {
+      const text = queuedPrompt.current;
+      queuedPrompt.current = null;
+      void sendMessage(text);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current, hasKey]);
 
   const newConversation = async () => {
     const c = await window.bullebrowser.conversations.new();

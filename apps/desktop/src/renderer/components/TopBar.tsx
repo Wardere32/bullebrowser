@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useBrowserStore, activeTabSelector } from '../state/browser-store.js';
 import { useAgentStore } from '../state/agent-store.js';
-import { parseAddressBarInput } from '../lib/url.js';
+import { AGENT_PROMPT_EVENT, parseAddressBarInput } from '../lib/url.js';
 import logo from '@bullebrowser/brand-tokens/logo.svg';
 
 export function TopBar() {
   const active = useBrowserStore(activeTabSelector);
   const aiPanelOpen = useBrowserStore((s) => s.aiPanelOpen);
   const toggleAi = useBrowserStore((s) => s.toggleAiPanel);
+  const setAiPanelOpen = useBrowserStore((s) => s.setAiPanelOpen);
   const openSettings = useBrowserStore((s) => s.openSettings);
   const openAbout = useBrowserStore((s) => s.openAbout);
   const currentStep = useAgentStore((s) => s.currentStep);
@@ -31,8 +32,18 @@ export function TopBar() {
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!active) return;
-    const url = parseAddressBarInput(draftUrl, searchProvider);
-    void window.bullebrowser.tabs.navigate(active.id, url);
+    const action = parseAddressBarInput(draftUrl, searchProvider);
+    if (action.type === 'agent') {
+      // BulleBrowser address bar → AI agent. Open the panel and hand
+      // the prompt off via a custom event so AiPanel can send it.
+      setAiPanelOpen(true);
+      window.dispatchEvent(
+        new CustomEvent<string>(AGENT_PROMPT_EVENT, { detail: action.prompt }),
+      );
+      setDraftUrl('');
+      return;
+    }
+    void window.bullebrowser.tabs.navigate(active.id, action.url);
   };
 
   return (
