@@ -16,20 +16,22 @@ const jetbrains = JetBrains_Mono({
   display: 'swap',
 });
 
-// Security headers for a static site on GitHub Pages.
-// GitHub Pages doesn't let us set HTTP response headers, so the meaningful
-// ones go in via <meta http-equiv>. HTTPS itself is handled by GitHub's
-// Let's Encrypt cert + the "Enforce HTTPS" toggle in Pages settings.
+// Content-Security-Policy enforced in the browser via <meta http-equiv>.
+// (GitHub Pages can't set HTTP response headers, and only CSP is widely
+// honored as a meta directive — X-Content-Type-Options and
+// Permissions-Policy are HTTP-header-only and would need a CDN proxy
+// like Cloudflare to be effective.)
 //
-// CSP is strict but allows what Next's static export actually needs:
-// inline scripts/styles for hydration, fonts/CSS bundled under /_next, and
-// the GitHub Releases API the Download button fetches at runtime.
+// 'unsafe-inline' for script-src/style-src is required by Next's static
+// export hydration; everything else is restricted.
 const CSP = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https:",
   "font-src 'self' data:",
+  // connect-src must include api.github.com so the Download button can
+  // resolve the latest release; github.com for any other XHR to releases.
   "connect-src 'self' https://api.github.com https://github.com",
   "object-src 'none'",
   "base-uri 'self'",
@@ -50,18 +52,18 @@ export const metadata: Metadata = {
     type: 'website',
   },
   robots: { index: true, follow: true },
+  // Renders as <meta name="referrer"> — the W3C-standard way for this one
+  // header (browsers honor it via that name).
   referrer: 'strict-origin-when-cross-origin',
-  other: {
-    'Content-Security-Policy': CSP,
-    'X-Content-Type-Options': 'nosniff',
-    'Permissions-Policy':
-      'accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), interest-cohort=()',
-  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${inter.variable} ${jetbrains.variable}`}>
+      <head>
+        {/* http-equiv (not name) — this is what browsers actually enforce. */}
+        <meta httpEquiv="Content-Security-Policy" content={CSP} />
+      </head>
       <body className="flex min-h-screen flex-col bg-surface-light text-ink-primary antialiased">
         <Header />
         <main className="flex-1">{children}</main>
