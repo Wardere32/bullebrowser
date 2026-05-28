@@ -16,6 +16,28 @@ const jetbrains = JetBrains_Mono({
   display: 'swap',
 });
 
+// Security headers for a static site on GitHub Pages.
+// GitHub Pages doesn't let us set HTTP response headers, so the meaningful
+// ones go in via <meta http-equiv>. HTTPS itself is handled by GitHub's
+// Let's Encrypt cert + the "Enforce HTTPS" toggle in Pages settings.
+//
+// CSP is strict but allows what Next's static export actually needs:
+// inline scripts/styles for hydration, fonts/CSS bundled under /_next, and
+// the GitHub Releases API the Download button fetches at runtime.
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: https:",
+  "font-src 'self' data:",
+  "connect-src 'self' https://api.github.com https://github.com",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+  'upgrade-insecure-requests',
+].join('; ');
+
 export const metadata: Metadata = {
   title: { default: product.name, template: `%s · ${product.name}` },
   description: product.tagline,
@@ -28,6 +50,13 @@ export const metadata: Metadata = {
     type: 'website',
   },
   robots: { index: true, follow: true },
+  referrer: 'strict-origin-when-cross-origin',
+  other: {
+    'Content-Security-Policy': CSP,
+    'X-Content-Type-Options': 'nosniff',
+    'Permissions-Policy':
+      'accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), interest-cohort=()',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
