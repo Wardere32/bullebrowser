@@ -22,9 +22,16 @@ export function getSettings(): AppSettings {
     ? (storedSearchProvider as AppSettings['searchProvider'])
     : DEFAULT_SETTINGS.searchProvider;
 
+  // Old defaults from earlier versions that we migrate silently to the
+  // current default (bullebrowser.com). Users who explicitly changed
+  // their homepage to something else keep their choice.
+  const LEGACY_DEFAULTS = new Set([
+    'https://bullebrowser.com/preview',
+    'https://duckduckgo.com',
+    'https://duckduckgo.com/',
+  ]);
   const normalizedHomepageUrl =
-    storedHomepageUrl === 'https://bullebrowser.com/preview' ||
-    !storedHomepageUrl?.trim()
+    !storedHomepageUrl?.trim() || LEGACY_DEFAULTS.has(storedHomepageUrl)
       ? DEFAULT_SETTINGS.homepageUrl
       : storedHomepageUrl;
 
