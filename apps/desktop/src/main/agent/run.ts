@@ -99,7 +99,10 @@ export async function startAgentRun(
     try {
       assistantText = await runAgent({
         apiKey,
-        model: req.model ?? DEFAULT_MODEL,
+        // Honor the user's persisted default if the renderer didn't pass
+        // one (race before Settings loads), only falling back to the
+        // hardcoded constant when neither is available.
+        model: req.model ?? getSettings().defaultModel ?? DEFAULT_MODEL,
         systemPrompt,
         history: conversation.messages
           .filter((m) => m !== userMsg)
