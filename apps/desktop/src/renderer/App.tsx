@@ -55,6 +55,21 @@ export function App() {
       appendStep(step);
       if (step.kind === 'done') finishRun();
       if (step.kind === 'error') setError(step.message);
+      // When a run finishes, the main process has saved the assistant's
+      // reply to the conversation store. Refetch so the response appears
+      // in the AI panel — without this, only the user's optimistic message
+      // shows and the assistant's text never makes it into the visible
+      // conversation history.
+      if (step.kind === 'done' || step.kind === 'error') {
+        const cur = useAgentStore.getState().current;
+        if (cur?.id) {
+          void window.bullebrowser.conversations.get(cur.id).then((updated) => {
+            // refreshCurrent updates messages without resetting steps/
+            // status — so the visible error/feed survives the refresh.
+            if (updated) useAgentStore.getState().refreshCurrent(updated);
+          });
+        }
+      }
     });
   }, [appendStep, finishRun, setError]);
 
