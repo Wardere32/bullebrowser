@@ -22,6 +22,7 @@ export function AiPanel() {
   const startRun = useAgentStore((s) => s.startRun);
   const status = useAgentStore((s) => s.status);
   const steps = useAgentStore((s) => s.steps);
+  const currentStep = useAgentStore((s) => s.currentStep);
   const runId = useAgentStore((s) => s.runId);
   const openSettings = useBrowserStore((s) => s.openSettings);
   const showSettings = useBrowserStore((s) => s.showSettings);
@@ -171,11 +172,20 @@ export function AiPanel() {
         {current?.messages.map((m, i) => (
           <Bubble key={i} role={m.role} content={m.content} />
         ))}
-        {status === 'running' && (
-          <div className="my-2 space-y-1 rounded border border-line bg-surface-muted p-2 text-[11px] text-ink-secondary">
+        {(status === 'running' || status === 'error') && (
+          <div
+            className={`my-2 space-y-1 rounded border p-2 text-[11px] ${
+              status === 'error'
+                ? 'border-danger/40 bg-danger/5 text-ink-primary'
+                : 'border-line bg-surface-muted text-ink-secondary'
+            }`}
+          >
             {steps.slice(-6).map((s, i) => (
               <div key={i}>{stepLabel(s)}</div>
             ))}
+            {status === 'error' && steps.length === 0 && (
+              <div className="text-danger">{currentStep || 'Agent error.'}</div>
+            )}
           </div>
         )}
       </div>

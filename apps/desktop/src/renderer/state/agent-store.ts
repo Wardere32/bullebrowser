@@ -46,6 +46,8 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
       return { steps: next, currentStep };
     }),
   finishRun: () => set({ status: 'idle', runId: null, currentStep: '' }),
-  setError: (msg) => set({ status: 'error', currentStep: msg }),
+  // An error means the run is over too — clear runId so the chrome
+  // doesn't keep a stale handle on the failed run.
+  setError: (msg) => set({ status: 'error', currentStep: msg, runId: null }),
   setPendingConfirm: (pendingConfirm) => set({ pendingConfirm }),
 }));
