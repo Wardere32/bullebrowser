@@ -128,8 +128,18 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_KEYCHAIN: build.keychain
-        run: pnpm --filter @bullebrowser/desktop package:mac
+        run: |
+          # Only point electron-builder at the imported keychain when we
+          # actually imported one. Otherwise disable identity auto-discovery
+          # so it produces an unsigned .app that the afterPack hook ad-hoc
+          # signs — Gatekeeper still requires right-click Open, but a build
+          # is produced instead of hard-failing the whole matrix.
+          if [ "${{ steps.mac_secrets.outputs.have_cert }}" = "1" ]; then
+            export CSC_KEYCHAIN=build.keychain
+          else
+            export CSC_IDENTITY_AUTO_DISCOVERY=false
+          fi
+          pnpm --filter @bullebrowser/desktop package:mac
 
 
       - name: Build & sign Windows installer
