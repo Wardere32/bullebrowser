@@ -32,7 +32,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if grep -R -nE '^\s*if:\s*.*secrets\.' .github/workflows/*.yml; then
+          if grep -R -nE '^\s*if:\s*.*\bsecrets\.' .github/workflows/*.yml; then
             echo 'Found forbidden step-level if: expression referencing secrets.* in workflow files'
             echo 'Use a probe step + outputs/env values instead of secrets in if conditions.'
             exit 1
