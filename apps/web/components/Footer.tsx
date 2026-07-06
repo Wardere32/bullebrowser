@@ -11,8 +11,8 @@ export function Footer() {
           <img
             src={asset('/wordmark.png')}
             alt={product.name}
-            height={24}
-            className="h-6 w-auto select-none"
+            height={28}
+            className="h-8 w-auto select-none"
             draggable={false}
           />
           <p className="max-w-xs text-sm text-ink-secondary">{product.tagline}.</p>

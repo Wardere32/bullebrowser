@@ -12,7 +12,7 @@ export function Header() {
             src={asset('/wordmark.png')}
             alt={product.name}
             height={28}
-            className="h-7 w-auto select-none"
+            className="h-8 w-auto select-none"
             draggable={false}
           />
         </Link>
