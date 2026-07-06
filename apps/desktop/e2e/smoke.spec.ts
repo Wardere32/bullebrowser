@@ -51,7 +51,7 @@ test('API key validation rejects malformed keys with a visible error', async () 
   await keyInput.fill('totally-bogus-key');
   await win.getByRole('button', { name: 'Save' }).click();
   await expect(
-    win.getByText(/doesn't look like an Anthropic API key/i),
+    win.getByText(/doesn't look like a BulleBrowser AI key/i),
   ).toBeVisible({ timeout: 5_000 });
   await app.close();
 });
