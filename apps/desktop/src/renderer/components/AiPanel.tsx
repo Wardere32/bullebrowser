@@ -8,17 +8,10 @@ import { useBrowserStore } from '../state/browser-store.js';
 import { AGENT_PROMPT_EVENT } from '../lib/url.js';
 import { expandSlashCommand, SLASH_COMMANDS } from '../lib/slash-commands.js';
 import { useInputActivity } from '../hooks/useInputActivity.js';
-import type { AppSettings, ConversationDetail, ConversationSummary } from '../../shared/ipc.js';
+import type { AppSettings } from '../../shared/ipc.js';
 import type { AgentStepEvent } from '../../shared/agent-events.js';
 
 export const FOCUS_AI_PANEL_EVENT = 'bullebrowser:focus-ai-panel';
-
-type ConversationBridge = {
-  list: () => Promise<ConversationSummary[]>;
-  get: (id: string) => Promise<ConversationDetail | null>;
-  create: () => Promise<ConversationDetail>;
-  delete: (id: string) => Promise<void>;
-};
 
 const MODELS: { id: ClaudeModelId; label: string }[] = [
   { id: 'claude-opus-4-7', label: 'BulleBrowser Pro (most capable)' },
@@ -35,42 +28,29 @@ export function AiPanel() {
   const steps = useAgentStore((s) => s.steps);
   const currentStep = useAgentStore((s) => s.currentStep);
   const runId = useAgentStore((s) => s.runId);
-  const openSettings = useBrowserStore((s) => s.openSettings);
-  const showSettings = useBrowserStore((s) => s.showSettings);
   const [draft, setDraft] = useState('');
   const [skillId, setSkillId] = useState<string>('');
   const [model, setModel] = useState<ClaudeModelId>('claude-opus-4-7');
-  const [hasKey, setHasKey] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const runInProgress = status === 'running';
   const promptActivity = useInputActivity();
-  const conversations = window.bullebrowser.conversations as unknown as ConversationBridge;
+  const bridge = window.bullebrowser as any;
 
   useEffect(() => {
     void (async () => {
-      setHasKey(await window.bullebrowser.secrets.hasApiKey());
       const settings: AppSettings = await window.bullebrowser.settings.get();
       setModel(settings.defaultModel);
-      const list = await conversations.list();
+      const list = await bridge.conversations.list();
       setConversations(list);
       if (list.length === 0) {
-        const first = await conversations.create();
+        const first = await bridge.conversations.create();
         setCurrent(first);
       } else if (list[0]) {
-        const detail = await conversations.get(list[0].id);
+        const detail = await bridge.conversations.get(list[0].id);
         setCurrent(detail);
       }
     })();
   }, [setConversations, setCurrent]);
-
-  // Re-check API key presence whenever the Settings modal closes — the user
-  // may have just added or cleared a key.
-  useEffect(() => {
-    if (showSettings) return;
-    void (async () => {
-      setHasKey(await window.bullebrowser.secrets.hasApiKey());
-    })();
-  }, [showSettings]);
 
   const sendMessage = async (text: string) => {
     const raw = text.trim();
@@ -168,9 +148,9 @@ export function AiPanel() {
   }, [current, status]);
 
   const newConversation = async () => {
-    const c = await conversations.create();
+    const c = await bridge.conversations.create();
     setCurrent(c);
-    setConversations(await conversations.list());
+    setConversations(await bridge.conversations.list());
   };
 
   return (
@@ -215,9 +195,7 @@ export function AiPanel() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-3">
-        {current && current.messages.length === 0 && (
-          <EmptyState hasKey={hasKey} onOpenSettings={openSettings} />
-        )}
+        {current && current.messages.length === 0 && <EmptyState />}
         {current?.messages.map((m, i) => (
           <Bubble key={i} role={m.role} content={m.content} />
         ))}
@@ -325,13 +303,7 @@ export function AiPanel() {
   );
 }
 
-function EmptyState({
-  hasKey,
-  onOpenSettings,
-}: {
-  hasKey: boolean;
-  onOpenSettings: () => void;
-}) {
+function EmptyState() {
   return (
     <div className="space-y-3 text-sm text-ink-primary">
       <div className="font-semibold">BulleBrowser Agent is ready.</div>
@@ -340,19 +312,6 @@ function EmptyState({
         browse, read, compare, and complete the task. This desktop experience is
         agent-first; the website is just the brand surface.
       </p>
-      {!hasKey && (
-        <div className="rounded border border-line bg-surface-muted p-3 text-[12px] text-ink-secondary">
-          Running in local-first mode. Add an optional provider key in{' '}
-          <button
-            type="button"
-            onClick={onOpenSettings}
-            className="font-medium text-primary underline"
-          >
-            Settings
-          </button>{' '}
-          if you want external model synthesis later.
-        </div>
-      )}
       <div className="space-y-2 rounded border border-line bg-surface-muted p-3">
         {skills.map((s) => (
           <div key={s.id}>
