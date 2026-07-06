@@ -13,6 +13,10 @@ import type { AgentStepEvent } from '../../shared/agent-events.js';
 
 export const FOCUS_AI_PANEL_EVENT = 'bullebrowser:focus-ai-panel';
 
+function browserBridge(): any {
+  return (window as unknown as { bullebrowser: any }).bullebrowser;
+}
+
 const MODELS: { id: ClaudeModelId; label: string }[] = [
   { id: 'claude-opus-4-7', label: 'BulleBrowser Pro (most capable)' },
   { id: 'claude-sonnet-4-6', label: 'BulleBrowser Balanced' },
@@ -34,11 +38,11 @@ export function AiPanel() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const runInProgress = status === 'running';
   const promptActivity = useInputActivity();
-  const bridge = window.bullebrowser as any;
 
   useEffect(() => {
     void (async () => {
-      const settings: AppSettings = await window.bullebrowser.settings.get();
+      const bridge = browserBridge();
+      const settings: AppSettings = await bridge.settings.get();
       setModel(settings.defaultModel);
       const list = await bridge.conversations.list();
       setConversations(list);
@@ -81,8 +85,9 @@ export function AiPanel() {
         { role: 'user', content: raw, timestamp: Date.now() },
       ],
     });
+    const bridge = browserBridge();
     const skill = skillId || undefined;
-    const { runId } = await window.bullebrowser.agent.run({
+    const { runId } = await bridge.agent.run({
       conversationId: current.id,
       userMessage: message,
       model,
@@ -147,7 +152,8 @@ export function AiPanel() {
     textareaRef.current?.focus();
   }, [current, status]);
 
-  const newConversation = async () => {
+  const createConversation = async () => {
+    const bridge = browserBridge();
     const c = await bridge.conversations.create();
     setCurrent(c);
     setConversations(await bridge.conversations.list());
@@ -160,7 +166,7 @@ export function AiPanel() {
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={newConversation}
+            onClick={createConversation}
             className="rounded px-2 py-1 text-xs text-ink-secondary hover:bg-surface-muted"
           >
             New chat
