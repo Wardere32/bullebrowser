@@ -17,7 +17,7 @@ Configure the following under **Settings → Secrets and variables → Actions**
 | `APPLE_TEAM_ID` | `build-desktop.yml` | 10-character Apple Developer Team ID |
 | `WINDOWS_CERTIFICATE` | `build-desktop.yml` | Base64 of the `.pfx` Authenticode signing certificate |
 
-> Important: macOS releases should be signed and notarized with a valid Apple Developer certificate and Apple ID to avoid Gatekeeper warnings. When signing/notarization secrets are missing, the workflow now falls back to an ad-hoc-signed, un-notarized build (and emits a warning) so the pipeline still produces artifacts.
+> Important: macOS public releases (tagged `v*.*.*`) must be signed and notarized with a valid Apple Developer certificate and Apple ID to avoid Gatekeeper malware warnings. The workflow now hard-fails tagged releases if notarization secrets are missing, preventing distribution of un-notarized public DMGs.
 | `WINDOWS_CERTIFICATE_PASSWORD` | `build-desktop.yml` | Password for the `.pfx` |
 
 The landing page deploys to **GitHub Pages** — no third-party host and
@@ -94,6 +94,18 @@ tag locally, run `build-desktop` manually:
 The workflow stamps package versions for the build, produces signed
 installers per platform, and publishes a GitHub Release at
 `v<version>` from the selected commit.
+
+### If macOS shows "could not verify free of malware"
+
+That means the downloaded app is not notarized by Apple (usually from an
+internal/manual build). For temporary local testing only, you can run:
+
+```
+xattr -dr com.apple.quarantine /Applications/BulleBrowser.app
+```
+
+For public distribution, do not use this workaround. Re-run release with
+all notarization secrets configured so Gatekeeper verifies the build.
 
 ## CI safeguards (added after v0.2.0 incident)
 
