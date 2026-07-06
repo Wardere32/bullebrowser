@@ -8,10 +8,17 @@ import { useBrowserStore } from '../state/browser-store.js';
 import { AGENT_PROMPT_EVENT } from '../lib/url.js';
 import { expandSlashCommand, SLASH_COMMANDS } from '../lib/slash-commands.js';
 import { useInputActivity } from '../hooks/useInputActivity.js';
-import type { AppSettings } from '../../shared/ipc.js';
+import type { AppSettings, ConversationDetail, ConversationSummary } from '../../shared/ipc.js';
 import type { AgentStepEvent } from '../../shared/agent-events.js';
 
 export const FOCUS_AI_PANEL_EVENT = 'bullebrowser:focus-ai-panel';
+
+type ConversationBridge = {
+  list: () => Promise<ConversationSummary[]>;
+  get: (id: string) => Promise<ConversationDetail | null>;
+  create: () => Promise<ConversationDetail>;
+  delete: (id: string) => Promise<void>;
+};
 
 const MODELS: { id: ClaudeModelId; label: string }[] = [
   { id: 'claude-opus-4-7', label: 'BulleBrowser Pro (most capable)' },
@@ -35,21 +42,22 @@ export function AiPanel() {
   const [model, setModel] = useState<ClaudeModelId>('claude-opus-4-7');
   const [hasKey, setHasKey] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const promptDisabled = status === 'running';
-  const promptActivity = useInputActivity({ disabled: promptDisabled });
+  const runInProgress = status === 'running';
+  const promptActivity = useInputActivity();
+  const conversations = window.bullebrowser.conversations as unknown as ConversationBridge;
 
   useEffect(() => {
     void (async () => {
       setHasKey(await window.bullebrowser.secrets.hasApiKey());
       const settings: AppSettings = await window.bullebrowser.settings.get();
       setModel(settings.defaultModel);
-      const list = await window.bullebrowser.conversations.list();
+      const list = await conversations.list();
       setConversations(list);
       if (list.length === 0) {
-        const first = await window.bullebrowser.conversations.new();
+        const first = await conversations.create();
         setCurrent(first);
       } else if (list[0]) {
-        const detail = await window.bullebrowser.conversations.get(list[0].id);
+        const detail = await conversations.get(list[0].id);
         setCurrent(detail);
       }
     })();
@@ -104,7 +112,7 @@ export function AiPanel() {
   };
 
   const send = async () => {
-    if (!draft.trim()) return;
+    if (runInProgress || !draft.trim()) return;
     const t = draft.trim();
     setDraft('');
     promptActivity.reset();
@@ -112,6 +120,7 @@ export function AiPanel() {
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (runInProgress) return;
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       void send();
@@ -159,9 +168,9 @@ export function AiPanel() {
   }, [current, status]);
 
   const newConversation = async () => {
-    const c = await window.bullebrowser.conversations.new();
+    const c = await conversations.create();
     setCurrent(c);
-    setConversations(await window.bullebrowser.conversations.list());
+    setConversations(await conversations.list());
   };
 
   return (
@@ -259,10 +268,14 @@ export function AiPanel() {
         <div className="flex items-end gap-2">
           <div className="flex-1">
             <div
-              className={`prompt-input-shell prompt-input-shell--${promptActivity.state} ${
-                promptDisabled ? 'prompt-input-shell--disabled' : ''
-              }`}
+              className={`prompt-input-shell prompt-input-shell--${promptActivity.state}`}
               data-activity-state={promptActivity.state}
+              onMouseDown={(e) => {
+                if (e.target === e.currentTarget) {
+                  e.preventDefault();
+                  textareaRef.current?.focus();
+                }
+              }}
             >
               <textarea
                 ref={textareaRef}
@@ -275,12 +288,13 @@ export function AiPanel() {
                 onFocus={promptActivity.onFocus}
                 onBlur={promptActivity.onBlur}
                 onKeyDown={onKeyDown}
-                disabled={promptDisabled}
                 placeholder={
                   'Ask BulleBrowser to do something. It will browse, read, compare, and report back.'
                 }
                 rows={3}
                 className="prompt-input-field"
+                aria-busy={runInProgress}
+                autoFocus={current?.messages.length === 0}
               />
             </div>
           </div>

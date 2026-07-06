@@ -52,7 +52,7 @@ const bridge: BrowserBridge = {
   conversations: {
     list: () => ipcRenderer.invoke(IPC.CONVERSATION_LIST),
     get: (id) => ipcRenderer.invoke(IPC.CONVERSATION_GET, id),
-    new: () => ipcRenderer.invoke(IPC.CONVERSATION_NEW),
+    create: () => ipcRenderer.invoke(IPC.CONVERSATION_NEW),
     delete: (id) => ipcRenderer.invoke(IPC.CONVERSATION_DELETE, id),
   },
   agent: {

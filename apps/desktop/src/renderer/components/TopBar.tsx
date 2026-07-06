@@ -3,12 +3,12 @@ import { useBrowserStore, activeTabSelector } from '../state/browser-store.js';
 import { useAgentStore } from '../state/agent-store.js';
 import { AGENT_PROMPT_EVENT, parseAddressBarInput } from '../lib/url.js';
 import { useInputActivity } from '../hooks/useInputActivity.js';
+import { FOCUS_AI_PANEL_EVENT } from './AiPanel.js';
 import logo from '@bullebrowser/brand-tokens/logo.svg';
 
 export function TopBar() {
   const active = useBrowserStore(activeTabSelector);
   const aiPanelOpen = useBrowserStore((s) => s.aiPanelOpen);
-  const toggleAi = useBrowserStore((s) => s.toggleAiPanel);
   const setAiPanelOpen = useBrowserStore((s) => s.setAiPanelOpen);
   const openSettings = useBrowserStore((s) => s.openSettings);
   const openAbout = useBrowserStore((s) => s.openAbout);
@@ -46,6 +46,12 @@ export function TopBar() {
       return;
     }
     void window.bullebrowser.tabs.navigate(active.id, action.url);
+  };
+
+  const openAssistant = () => {
+    setAiPanelOpen(true);
+    setTimeout(() => window.dispatchEvent(new Event(FOCUS_AI_PANEL_EVENT)), 0);
+    setTimeout(() => window.dispatchEvent(new Event(FOCUS_AI_PANEL_EVENT)), 80);
   };
 
   return (
@@ -120,7 +126,7 @@ export function TopBar() {
 
       <button
         type="button"
-        onClick={toggleAi}
+        onClick={openAssistant}
         className={`no-drag rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
           aiPanelOpen
             ? 'bg-primary text-white'
@@ -128,7 +134,7 @@ export function TopBar() {
         }`}
         aria-pressed={aiPanelOpen}
       >
-        Agent
+        Your Assistant
       </button>
 
       <div className="no-drag relative">

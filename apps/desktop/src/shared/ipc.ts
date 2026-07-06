@@ -166,7 +166,7 @@ export interface BrowserBridge {
   conversations: {
     list(): Promise<ConversationSummary[]>;
     get(id: string): Promise<ConversationDetail | null>;
-    new(): Promise<ConversationDetail>;
+    create(): Promise<ConversationDetail>;
     delete(id: string): Promise<void>;
   };
   agent: {
