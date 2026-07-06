@@ -51,6 +51,8 @@ jobs:
       # path). To revert to the project URL (wardere83.github.io/bullebrowser),
       # remove the CNAME and set NEXT_PUBLIC_BASE_PATH=/bullebrowser here.
       - name: Build static export
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm --filter @bullebrowser/web build
 
       # enablement: true turns GitHub Pages ON automatically (build type =

@@ -5,7 +5,7 @@
   "description": "BulleBrowser landing page (bullebrowser.com)",
   "scripts": {
     "dev": "next dev -p 3000",
-    "build": "next build",
+    "build": "node scripts/generate-release-manifest.mjs && next build",
     "preview": "npx --yes serve@latest out -l 3000",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",

@@ -1,8 +1,9 @@
-// Client-side helpers for the GitHub Releases API. The site is a static
-// export on GitHub Pages — no server — so the browser resolves downloads
-// directly. To guarantee every visitor gets a working installer even when
-// the newest release is partial (e.g. a Linux-only preview), we scan the
-// most recent releases and pick, per platform, the newest asset available.
+// Download metadata is baked into a static manifest at build time so the
+// site does not depend on the browser hitting the unauthenticated GitHub API.
+// We still keep a live API fallback for local/dev cases where the manifest
+// is missing.
+
+import { basePath } from '@/lib/asset';
 
 export type Platform =
   | 'mac-universal'
@@ -47,6 +48,7 @@ export const REPO_NAME =
   'bullebrowser';
 export const RELEASES_PAGE = `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases`;
 export const AGENT_MIN_TAG = 'v0.2.0';
+const LOCAL_MANIFEST_PATH = `${basePath}/releases-manifest.json`;
 
 interface RawAsset {
   name: string;
@@ -60,6 +62,11 @@ interface RawRelease {
   draft: boolean;
   prerelease: boolean;
   assets: RawAsset[];
+}
+
+interface ReleaseManifest {
+  generatedAt: string;
+  releases: RawRelease[];
 }
 
 function semverParts(tag: string): [number, number, number] | null {
@@ -88,33 +95,7 @@ function classify(name: string): Platform | null {
   return null;
 }
 
-export async function fetchDownloads(): Promise<Downloads> {
-  const empty: Downloads = {
-    latestTag: null,
-    publishedAt: null,
-    forPlatform: {},
-    checksumsUrl: null,
-    agentReady: false,
-    agentMinTag: AGENT_MIN_TAG,
-    latestReleaseUrl: null,
-    apiUnavailable: false,
-  };
-  let releases: RawRelease[];
-  try {
-    const res = await fetch(
-      `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases?per_page=15`,
-      { headers: { Accept: 'application/vnd.github+json' } },
-    );
-    if (!res.ok) {
-      // 404 = no releases yet; other non-OK = API issue we can still recover from.
-      return { ...empty, apiUnavailable: res.status >= 500 || res.status === 403 };
-    }
-    releases = (await res.json()) as RawRelease[];
-  } catch {
-    return { ...empty, apiUnavailable: true };
-  }
-
-  // Newest first (the API already returns this order; sort defensively).
+function downloadsFromReleases(releases: RawRelease[], apiUnavailable: boolean): Downloads {
   const published = releases
     .filter((r) => !r.draft)
     .sort(
@@ -123,6 +104,7 @@ export async function fetchDownloads(): Promise<Downloads> {
     );
 
   const latest = published[0] ?? null;
+  const latestTag = latest?.tag_name ?? null;
   const forPlatform: Downloads['forPlatform'] = {};
   const checksumsUrl =
     latest?.assets.find((asset) => /checksum/i.test(asset.name))?.browser_download_url ?? null;
@@ -130,7 +112,6 @@ export async function fetchDownloads(): Promise<Downloads> {
   for (const rel of published) {
     for (const a of rel.assets) {
       const platform = classify(a.name);
-      // First (newest) asset wins for each platform.
       if (platform && !forPlatform[platform]) {
         forPlatform[platform] = {
           name: a.name,
@@ -141,7 +122,7 @@ export async function fetchDownloads(): Promise<Downloads> {
       }
     }
   }
-  const latestTag = latest?.tag_name ?? null;
+
   return {
     latestTag,
     publishedAt: latest?.published_at ?? null,
@@ -150,8 +131,35 @@ export async function fetchDownloads(): Promise<Downloads> {
     agentReady: latestTag ? semverGte(latestTag, AGENT_MIN_TAG) : false,
     agentMinTag: AGENT_MIN_TAG,
     latestReleaseUrl: latest?.html_url ?? null,
-    apiUnavailable: false,
+    apiUnavailable,
   };
+}
+
+export async function fetchDownloads(): Promise<Downloads> {
+  try {
+    const manifestRes = await fetch(LOCAL_MANIFEST_PATH, { cache: 'no-store' });
+    if (manifestRes.ok) {
+      const manifest = (await manifestRes.json()) as ReleaseManifest;
+      if (Array.isArray(manifest.releases)) {
+        return downloadsFromReleases(manifest.releases, false);
+      }
+    }
+  } catch {
+    // Fall through to the live API.
+  }
+
+  try {
+    const res = await fetch(
+      `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases?per_page=15`,
+      { headers: { Accept: 'application/vnd.github+json' } },
+    );
+    if (!res.ok) {
+      return downloadsFromReleases([], res.status >= 500 || res.status === 403);
+    }
+    return downloadsFromReleases((await res.json()) as RawRelease[], false);
+  } catch {
+    return downloadsFromReleases([], true);
+  }
 }
 
 export function detectPlatform(userAgent: string): Platform {
