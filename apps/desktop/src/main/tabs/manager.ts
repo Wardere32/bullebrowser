@@ -301,7 +301,7 @@ class TabManager {
 
   private relayout() {
     if (!this.win) return;
-    const [w, h] = this.win.getContentSize();
+    const [contentWidth = 0, contentHeight = 0] = this.win.getContentSize();
     const top = this.bounds.topInset;
     const right = this.bounds.rightInset;
     for (const t of this.tabs) {
@@ -309,8 +309,8 @@ class TabManager {
         t.view.setBounds({
           x: 0,
           y: top,
-          width: Math.max(0, w - right),
-          height: Math.max(0, h - top),
+          width: Math.max(0, contentWidth - right),
+          height: Math.max(0, contentHeight - top),
         });
         t.view.setVisible(true);
       } else {

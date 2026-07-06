@@ -31,7 +31,7 @@ describe('policy decisions and redaction', () => {
       safe: 'ok',
     }) as Record<string, unknown>;
 
-    expect(redacted.apiKey).toBe('[REDACTED]');
+    expect(redacted.apiKey).toBe('[REDACTED_API_KEY]');
     expect(redacted.token).toBe('[REDACTED]');
     expect(redacted.safe).toBe('ok');
   });

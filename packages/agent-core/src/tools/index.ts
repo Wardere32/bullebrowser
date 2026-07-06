@@ -136,7 +136,7 @@ export const tools = {
     description: 'Create a concise local summary from page text.',
     inputSchema: SummarizeInput,
     outputSchema: SummaryOut,
-    execute: async (input) => {
+    execute: async (input, _ctx) => {
       const maxSentences = input.maxSentences ?? 4;
       const compact = input.text.replace(/\s+/g, ' ').trim();
       const sentences = compact
