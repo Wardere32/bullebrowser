@@ -19,6 +19,7 @@ files:
   - "!**/{tsconfig.json,tsconfig.*.json,vitest.config.*,.eslintrc*,eslint.config.*}"
 
 asar: false
+npmRebuild: false
 asarUnpack:
   - resources/**
 
