@@ -261,10 +261,18 @@ jobs:
           if-no-files-found: warn
 
       - name: Combine checksums
+        shell: bash
         run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
           mkdir -p release-assets
           find dist -type f \( -name '*.dmg' -o -name '*.exe' -o -name '*.AppImage' -o -name '*.deb' -o -name '*.zip' -o -name 'latest*.yml' \) -exec cp {} release-assets/ \;
-          cat dist/**/checksums-*.txt > release-assets/checksums.txt || true
+          checksum_files=(dist/**/checksums-*.txt)
+          if (( ${#checksum_files[@]} > 0 )); then
+            cat "${checksum_files[@]}" > release-assets/checksums.txt
+          else
+            : > release-assets/checksums.txt
+          fi
           ls -la release-assets
 
       - name: Generate release notes from Conventional Commits
