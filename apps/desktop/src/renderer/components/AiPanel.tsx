@@ -14,9 +14,9 @@ import type { AgentStepEvent } from '../../shared/agent-events.js';
 export const FOCUS_AI_PANEL_EVENT = 'bullebrowser:focus-ai-panel';
 
 const MODELS: { id: ClaudeModelId; label: string }[] = [
-  { id: 'claude-opus-4-7', label: 'Opus 4.7 (most capable)' },
-  { id: 'claude-sonnet-4-6', label: 'Sonnet 4.6 (balanced)' },
-  { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5 (fastest)' },
+  { id: 'claude-opus-4-7', label: 'BulleBrowser Pro (most capable)' },
+  { id: 'claude-sonnet-4-6', label: 'BulleBrowser Balanced' },
+  { id: 'claude-haiku-4-5-20251001', label: 'BulleBrowser Fastest' },
 ];
 
 export function AiPanel() {
@@ -310,10 +310,11 @@ export function AiPanel() {
 function ApiKeyPrompt({ onOpenSettings }: { onOpenSettings: () => void }) {
   return (
     <div className="rounded border border-line bg-surface-muted p-4 text-sm text-ink-primary">
-      <div className="mb-1 font-semibold">Add your Anthropic API key</div>
+      <div className="mb-1 font-semibold">Add your BulleBrowser AI key</div>
       <p className="mb-3 text-ink-secondary">
-        BulleBrowser uses your own Anthropic API key (BYOK). Your prompts go
-        directly to Anthropic — never to Bulle Consulting.
+        BulleBrowser uses your own provider key (BYOK). Your prompts stay
+        under your configured provider account and are not routed through
+        third-party analytics services.
       </p>
       <button
         type="button"

@@ -52,7 +52,7 @@ export default function PreviewPage() {
       <div className="mt-14 rounded-lg border border-line bg-surface-muted p-6">
         <div className="text-lg font-semibold">Ready to try it yourself?</div>
         <p className="mt-1 text-sm text-ink-secondary">
-          Free download for macOS, Windows, and Linux. Bring your own Anthropic
+          Free download for macOS, Windows, and Linux. Bring your own BulleBrowser AI
           API key.
         </p>
         <div className="mt-4">

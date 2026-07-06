@@ -1,6 +1,6 @@
 export const product = {
   name: 'BulleBrowser',
-  vendor: 'Bulle Consulting',
+  vendor: 'BulleBrowser',
   tagline: 'The agentic browser for grants, RFPs, and compliance work',
   domain: 'bullebrowser.com',
   bundleId: 'com.bulleconsulting.bullebrowser',
@@ -9,7 +9,7 @@ export const product = {
   // treats the running app as a second, ungrouped taskbar entry.
   appId: 'com.bulleconsulting.bullebrowser',
   windowTitle: 'BulleBrowser',
-  splashText: 'BulleBrowser by Bulle Consulting',
+  splashText: 'BulleBrowser Agentic AI',
   contactEmail: 'hello@bulleconsulting.com',
 } as const;
 

@@ -6,9 +6,9 @@ import type { AppSettings } from '../../shared/ipc.js';
 import { Modal } from './Modal.js';
 
 const MODELS: { id: ClaudeModelId; label: string }[] = [
-  { id: 'claude-opus-4-7', label: 'Claude Opus 4.7' },
-  { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
-  { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
+  { id: 'claude-opus-4-7', label: 'BulleBrowser Pro' },
+  { id: 'claude-sonnet-4-6', label: 'BulleBrowser Balanced' },
+  { id: 'claude-haiku-4-5-20251001', label: 'BulleBrowser Fastest' },
 ];
 
 export function SettingsModal() {
@@ -74,11 +74,11 @@ export function SettingsModal() {
       <section className="space-y-4">
         <div>
           <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-secondary">
-            Anthropic API key
+            BulleBrowser AI key
           </h3>
           <p className="mt-1 text-xs text-ink-secondary">
             Stored encrypted in your OS keychain. Used only to call the
-            Anthropic API directly from this device.
+            configured AI provider directly from this device.
           </p>
           {hasKey ? (
             <div className="mt-2 flex items-center gap-2">

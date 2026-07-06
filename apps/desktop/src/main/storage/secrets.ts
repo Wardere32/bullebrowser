@@ -20,7 +20,7 @@ export function setApiKey(plain: string): void {
   if (!trimmed) throw new Error('API key is empty.');
   if (!/^sk-ant-/.test(trimmed)) {
     throw new Error(
-      "That doesn't look like an Anthropic API key. Anthropic keys start with 'sk-ant-'.",
+      "That doesn't look like a BulleBrowser AI key. Current supported keys start with 'sk-ant-'.",
     );
   }
   if (trimmed.length < 40) {

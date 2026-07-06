@@ -52,7 +52,7 @@ export async function startAgentRun(
   const apiKey = getApiKey();
   if (!apiKey) {
     throw new Error(
-      'No Anthropic API key configured. Open Settings → AI to add one.',
+      'No BulleBrowser AI key configured. Open Settings → AI to add one.',
     );
   }
   const conversation = conversationStore.get(req.conversationId);

@@ -39,7 +39,7 @@ const CONTROLS = [
   ['You stay in control', 'A live “Agent is working” indicator shows each step, and a Stop button cancels instantly.'],
   ['No runaways', 'Every task is hard-capped at 25 actions.'],
   ['Ask before acting', 'Form submissions and downloads require your explicit confirmation.'],
-  ['Your model', 'Choose Claude Opus, Sonnet, or Haiku per task.'],
+  ['Your model', 'Choose BulleBrowser Pro, Balanced, or Fastest per task.'],
 ];
 
 function Section({
@@ -73,7 +73,7 @@ export default function FeaturesPage() {
           </h1>
           <p className="mt-6 max-w-2xl text-lg leading-relaxed text-ink-inverse/70">
             {product.name} pairs a real, full-featured browser with a
-            Claude-powered agent. It works the web the way a person does —
+            BulleBrowser-powered agent. It works the web the way a person does —
             reading, clicking, typing, extracting — but in a deterministic,
             stoppable loop you can trust.
           </p>
@@ -129,7 +129,7 @@ export default function FeaturesPage() {
       {/* Privacy */}
       <Section eyebrow="Privacy" title="Bring your own key. Keep your own data.">
         <ul className="max-w-2xl space-y-3 text-[15px] leading-relaxed text-ink-secondary">
-          <li>Your prompts go straight to Anthropic — never to {product.vendor}.</li>
+          <li>Your prompts go directly through your configured provider from your device.</li>
           <li>Your API key is encrypted in your operating system&apos;s keychain.</li>
           <li>History, bookmarks, and conversations stay on your device.</li>
           <li>No analytics. No telemetry.</li>

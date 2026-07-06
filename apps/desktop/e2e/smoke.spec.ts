@@ -39,7 +39,7 @@ test('AI agent panel mounts after toggling open', async () => {
 
 test('fresh profile shows the API-key prompt and disables the textarea', async () => {
   const { app, win } = await launch();
-  await expect(win.getByText('Add your Anthropic API key')).toBeVisible();
+  await expect(win.getByText('Add your BulleBrowser AI key')).toBeVisible();
   await expect(win.locator('aside textarea')).toBeDisabled();
   await app.close();
 });

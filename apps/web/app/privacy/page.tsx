@@ -16,7 +16,7 @@ export default function PrivacyPage() {
       <p>
         {product.name} is bring-your-own-key. Your prompts and tool
         outputs go directly from your computer to the AI provider you
-        configure (Anthropic, in v1). Nothing is routed through{' '}
+        configure. Nothing is routed through{' '}
         {product.vendor} servers. We have no analytics or telemetry in v1.
       </p>
 
@@ -59,13 +59,11 @@ export default function PrivacyPage() {
       <h2>Data sent to third parties</h2>
       <p>
         When you submit a prompt to the AI panel, the renderer hands it to
-        the main process, which calls Anthropic&apos;s Messages API directly
+        the main process, which calls your configured provider API directly
         from your machine using the API key you configured. The text of
         your prompt, your conversation history, and the contents of any
-        web pages the agent reads on your behalf are sent to Anthropic
-        under <a href="https://www.anthropic.com/legal/commercial-terms">
-        their terms</a> and <a href="https://www.anthropic.com/legal/privacy">
-        privacy policy</a>.
+        web pages the agent reads on your behalf are sent under that
+        provider&apos;s terms and privacy policy.
       </p>
       <p>
         When the agent navigates to a website, that website may set
