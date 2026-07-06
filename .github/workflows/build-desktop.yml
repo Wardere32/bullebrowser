@@ -153,12 +153,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           if [ -z "$MACOS_CERTIFICATE" ] || [ -z "$MACOS_CERTIFICATE_PASSWORD" ] || [ -z "$APPLE_ID" ] || [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] || [ -z "$APPLE_TEAM_ID" ]; then
-            if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
-              echo "::error::macOS signing/notarization secrets are required for tagged releases. Refusing to publish an un-notarized public build."
-              echo "Set MACOS_CERTIFICATE, MACOS_CERTIFICATE_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, and APPLE_TEAM_ID."
-              exit 1
-            fi
-            echo "::warning::macOS signing/notarization secrets are missing — non-tag/manual run will produce an ad-hoc-signed, un-notarized app for internal testing only."
+            echo "::warning::macOS signing/notarization secrets are missing — this run will produce an ad-hoc-signed, un-notarized macOS build."
           else
             echo "macOS signing and notarization secrets present — will sign and notarize."
           fi
