@@ -23,9 +23,9 @@ async function launch() {
   // rebrand made the agent the front-and-center surface). Open the
   // panel idempotently so this works whether the boot lands open or
   // closed.
-  const panelHeader = win.locator('aside').getByText('AI agent');
+  const panelHeader = win.locator('aside').getByText('BulleBrowser Agent');
   if (!(await panelHeader.isVisible().catch(() => false))) {
-    await win.getByRole('button', { name: 'AI' }).click();
+    await win.getByRole('button', { name: 'Agent' }).click();
   }
   await expect(panelHeader).toBeVisible({ timeout: 10_000 });
   return { app, win };
@@ -33,14 +33,14 @@ async function launch() {
 
 test('AI agent panel mounts after toggling open', async () => {
   const { app, win } = await launch();
-  await expect(win.locator('aside').getByText('AI agent')).toBeVisible();
+  await expect(win.locator('aside').getByText('BulleBrowser Agent')).toBeVisible();
   await app.close();
 });
 
-test('fresh profile shows the API-key prompt and disables the textarea', async () => {
+test('fresh profile opens directly into an agent-ready composer without a key', async () => {
   const { app, win } = await launch();
-  await expect(win.getByText('Add your BulleBrowser AI key')).toBeVisible();
-  await expect(win.locator('aside textarea')).toBeDisabled();
+  await expect(win.getByText('Running in local-first mode.')).toBeVisible();
+  await expect(win.locator('aside textarea')).toBeEnabled();
   await app.close();
 });
 

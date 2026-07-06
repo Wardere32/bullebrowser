@@ -108,7 +108,7 @@ export interface AgentStep {
 export type AgentStepHandler = (step: AgentStep) => void;
 
 export interface AgentInput {
-  apiKey: string;
+  apiKey?: string;
   model: ClaudeModelId;
   systemPrompt: string;
   history: { role: 'user' | 'assistant'; content: string }[];

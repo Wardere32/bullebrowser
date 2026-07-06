@@ -26,6 +26,8 @@ export function getSettings(): AppSettings {
   // current default (bullebrowser.com). Users who explicitly changed
   // their homepage to something else keep their choice.
   const LEGACY_DEFAULTS = new Set([
+    'https://bullebrowser.com',
+    'https://bullebrowser.com/',
     'https://bullebrowser.com/preview',
     'https://duckduckgo.com',
     'https://duckduckgo.com/',

@@ -33,9 +33,9 @@ export function AiPanel() {
   const [draft, setDraft] = useState('');
   const [skillId, setSkillId] = useState<string>('');
   const [model, setModel] = useState<ClaudeModelId>('claude-opus-4-7');
-  const [hasKey, setHasKey] = useState(true);
+  const [hasKey, setHasKey] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const promptDisabled = !hasKey || status === 'running';
+  const promptDisabled = status === 'running';
   const promptActivity = useInputActivity({ disabled: promptDisabled });
 
   useEffect(() => {
@@ -66,7 +66,7 @@ export function AiPanel() {
 
   const sendMessage = async (text: string) => {
     const raw = text.trim();
-    if (!raw || !current || !hasKey) return;
+    if (!raw || !current) return;
     // Slash commands expand client-side into a fully formed agent prompt so
     // the model sees a plain task and the user sees what they typed.
     const expanded = expandSlashCommand(raw);
@@ -128,13 +128,13 @@ export function AiPanel() {
     const handler = (e: Event) => {
       const text = (e as CustomEvent<string>).detail;
       if (!text) return;
-      if (current && hasKey) void sendMessage(text);
+      if (current) void sendMessage(text);
       else queuedPrompt.current = text;
     };
     window.addEventListener(AGENT_PROMPT_EVENT, handler);
     return () => window.removeEventListener(AGENT_PROMPT_EVENT, handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current, hasKey]);
+  }, [current]);
 
   // Cmd+/ focuses the AI panel input — Comet-style "summon the agent".
   useEffect(() => {
@@ -145,13 +145,18 @@ export function AiPanel() {
 
   // Flush any queued address-bar prompt once we're ready.
   useEffect(() => {
-    if (current && hasKey && queuedPrompt.current) {
+    if (current && queuedPrompt.current) {
       const text = queuedPrompt.current;
       queuedPrompt.current = null;
       void sendMessage(text);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current, hasKey]);
+  }, [current]);
+
+  useEffect(() => {
+    if (!current || current.messages.length > 0 || status === 'running') return;
+    textareaRef.current?.focus();
+  }, [current, status]);
 
   const newConversation = async () => {
     const c = await window.bullebrowser.conversations.new();
@@ -160,9 +165,9 @@ export function AiPanel() {
   };
 
   return (
-    <aside className="flex w-[380px] flex-col border-l border-line/30 bg-surface-light">
+    <aside className="flex w-[440px] flex-col border-l border-line/30 bg-surface-light">
       <header className="flex items-center justify-between gap-2 border-b border-line/60 px-3 py-2">
-        <div className="text-sm font-semibold text-ink-primary">AI agent</div>
+        <div className="text-sm font-semibold text-ink-primary">BulleBrowser Agent</div>
         <div className="flex items-center gap-1">
           <button
             type="button"
@@ -201,8 +206,9 @@ export function AiPanel() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-3">
-        {!hasKey && <ApiKeyPrompt onOpenSettings={openSettings} />}
-        {hasKey && current && current.messages.length === 0 && <EmptyState />}
+        {current && current.messages.length === 0 && (
+          <EmptyState hasKey={hasKey} onOpenSettings={openSettings} />
+        )}
         {current?.messages.map((m, i) => (
           <Bubble key={i} role={m.role} content={m.content} />
         ))}
@@ -271,9 +277,7 @@ export function AiPanel() {
                 onKeyDown={onKeyDown}
                 disabled={promptDisabled}
                 placeholder={
-                  hasKey
-                    ? 'Ask the agent anything. Try /summarize, /compare-tabs, /find — or just describe a task.'
-                    : 'Add an API key in Settings to start chatting.'
+                  'Ask BulleBrowser to do something. It will browse, read, compare, and report back.'
                 }
                 rows={3}
                 className="prompt-input-field"
@@ -295,7 +299,7 @@ export function AiPanel() {
             <button
               type="button"
               onClick={() => void send()}
-              disabled={!hasKey || !draft.trim()}
+              disabled={!draft.trim()}
               className="h-9 rounded bg-primary px-3 text-sm font-medium text-white hover:bg-primary-hover disabled:bg-line"
             >
               Send
@@ -307,35 +311,34 @@ export function AiPanel() {
   );
 }
 
-function ApiKeyPrompt({ onOpenSettings }: { onOpenSettings: () => void }) {
-  return (
-    <div className="rounded border border-line bg-surface-muted p-4 text-sm text-ink-primary">
-      <div className="mb-1 font-semibold">Add your BulleBrowser AI key</div>
-      <p className="mb-3 text-ink-secondary">
-        BulleBrowser uses your own provider key (BYOK). Your prompts stay
-        under your configured provider account and are not routed through
-        third-party analytics services.
-      </p>
-      <button
-        type="button"
-        onClick={onOpenSettings}
-        className="rounded bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-hover"
-      >
-        Open Settings
-      </button>
-    </div>
-  );
-}
-
-function EmptyState() {
+function EmptyState({
+  hasKey,
+  onOpenSettings,
+}: {
+  hasKey: boolean;
+  onOpenSettings: () => void;
+}) {
   return (
     <div className="space-y-3 text-sm text-ink-primary">
-      <div className="font-semibold">Welcome to BulleBrowser.</div>
+      <div className="font-semibold">BulleBrowser Agent is ready.</div>
       <p className="text-ink-secondary">
-        Ask the agent to research grants, compare RFPs side by side, or check a
-        document for compliance. Pick a skill above for a guided workflow, or
-        type any task and the agent will use the live tabs to complete it.
+        Type a task in the box below and BulleBrowser will use your live tabs to
+        browse, read, compare, and complete the task. This desktop experience is
+        agent-first; the website is just the brand surface.
       </p>
+      {!hasKey && (
+        <div className="rounded border border-line bg-surface-muted p-3 text-[12px] text-ink-secondary">
+          Running in local-first mode. Add an optional provider key in{' '}
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            className="font-medium text-primary underline"
+          >
+            Settings
+          </button>{' '}
+          if you want external model synthesis later.
+        </div>
+      )}
       <div className="space-y-2 rounded border border-line bg-surface-muted p-3">
         {skills.map((s) => (
           <div key={s.id}>

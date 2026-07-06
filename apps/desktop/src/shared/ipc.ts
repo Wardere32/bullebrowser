@@ -79,7 +79,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultModel: 'claude-opus-4-7',
   aiPanelOpen: true,
   searchProvider: 'bullebrowser',
-  homepageUrl: 'https://bullebrowser.com',
+  homepageUrl: 'about:blank',
   complianceChecklist: [
     'EEO: Equal Employment Opportunity references and required language',
     'FERPA: Family Educational Rights and Privacy Act references',

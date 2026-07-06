@@ -74,11 +74,11 @@ export function SettingsModal() {
       <section className="space-y-4">
         <div>
           <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-secondary">
-            BulleBrowser AI key
+            BulleBrowser AI key (optional)
           </h3>
           <p className="mt-1 text-xs text-ink-secondary">
             Stored encrypted in your OS keychain. Used only to call the
-            configured AI provider directly from this device.
+            configured AI provider directly from this device when you choose to use one.
           </p>
           {hasKey ? (
             <div className="mt-2 flex items-center gap-2">
@@ -134,7 +134,7 @@ export function SettingsModal() {
 
         <div>
           <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-secondary">
-            Default model
+            External model preset
           </h3>
           <select
             value={settings.defaultModel}

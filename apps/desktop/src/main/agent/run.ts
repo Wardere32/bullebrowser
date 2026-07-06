@@ -50,11 +50,6 @@ export async function startAgentRun(
   req: AgentRunRequest,
 ): Promise<{ runId: string }> {
   const apiKey = getApiKey();
-  if (!apiKey) {
-    throw new Error(
-      'No BulleBrowser AI key configured. Open Settings → AI to add one.',
-    );
-  }
   const conversation = conversationStore.get(req.conversationId);
   if (!conversation) throw new Error('Conversation not found');
 
@@ -108,7 +103,7 @@ export async function startAgentRun(
     let assistantText = '';
     try {
       assistantText = await runAgent({
-        apiKey,
+        apiKey: apiKey ?? undefined,
         // Honor the user's persisted default if the renderer didn't pass
         // one (race before Settings loads), only falling back to the
         // hardcoded constant when neither is available.

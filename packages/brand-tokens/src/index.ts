@@ -58,7 +58,7 @@ export const radii = {
 export const spacing = {
   topBarHeight: 44,
   tabStripHeight: 36,
-  aiPanelWidth: 380,
+  aiPanelWidth: 440,
   sidePadding: 12,
 } as const;
 

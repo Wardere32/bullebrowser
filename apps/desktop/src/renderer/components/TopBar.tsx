@@ -22,7 +22,7 @@ export function TopBar() {
   const addressActivity = useInputActivity();
 
   useEffect(() => {
-    setDraftUrl(active?.url ?? '');
+    setDraftUrl(active?.url === 'about:blank' ? '' : (active?.url ?? ''));
   }, [active?.url]);
 
   useEffect(() => {
@@ -97,7 +97,7 @@ export function TopBar() {
             onPaste={() => addressActivity.onInputActivity()}
             onFocus={addressActivity.onFocus}
             onBlur={addressActivity.onBlur}
-            placeholder="Search or enter address"
+            placeholder="Ask BulleBrowser or enter address"
             aria-label="Address bar"
             className="prompt-input-field prompt-input-field--singleline prompt-input-field--dark"
           />
@@ -128,7 +128,7 @@ export function TopBar() {
         }`}
         aria-pressed={aiPanelOpen}
       >
-        AI
+        Agent
       </button>
 
       <div className="no-drag relative">
