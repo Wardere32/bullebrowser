@@ -1,7 +1,7 @@
 export const product = {
   name: 'BulleBrowser',
   vendor: 'BulleBrowser',
-  tagline: 'The agentic browser for grants, RFPs, and compliance work',
+  tagline: 'The browser that navigates for you',
   domain: 'bullebrowser.com',
   bundleId: 'com.bulleconsulting.bullebrowser',
   // Must match electron-builder.yml's `appId` exactly (case-sensitive) so the
@@ -9,7 +9,7 @@ export const product = {
   // treats the running app as a second, ungrouped taskbar entry.
   appId: 'com.bulleconsulting.bullebrowser',
   windowTitle: 'BulleBrowser',
-  splashText: 'BulleBrowser Agentic AI',
+  splashText: 'BulleBrowser',
   contactEmail: 'hello@bulleconsulting.com',
 } as const;
 

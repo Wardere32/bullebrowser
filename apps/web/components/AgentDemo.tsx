@@ -9,17 +9,17 @@
 import { useEffect, useState } from 'react';
 
 const STEPS = [
-  'navigate  sam.gov/opportunities',
-  'type  “youth workforce”',
-  'click  Apply filters',
-  'extract  opportunities[]',
+  'navigate  example.com/docs',
+  'type  “summarize the page”',
+  'click  relevant link',
+  'extract  key_points[]',
 ];
 
 const ROWS = [
-  ['Workforce Pathways · Rural Youth', 'DOL', 'Jun 14', '$2.5M'],
-  ['After-School STEM Capacity', 'ED', 'Jun 28', '$1.1M'],
-  ['Trauma-Informed Schools', 'HHS', 'Jul 10', '$750K'],
-  ['Apprenticeship Expansion', 'DOL', 'Jul 25', '$4.0M'],
+  ['Overview', 'Found a concise summary'],
+  ['Details', 'Extracted the main points'],
+  ['Action', 'Recommended next step'],
+  ['Status', 'Completed with citations'],
 ];
 
 // Total frames in one loop. Steps tick, then rows fill, then a pause.
@@ -54,7 +54,7 @@ export function AgentDemo() {
         <span className="h-2.5 w-2.5 rounded-full bg-yellow-300/80" />
         <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/80" />
         <div className="ml-3 flex h-5 flex-1 items-center truncate rounded-md bg-white/10 px-2 text-[10px] text-white/70">
-          sam.gov/opportunities?keywords=youth+workforce
+          example.com/docs
         </div>
         <div className="rounded bg-primary px-2 py-0.5 text-[10px] font-semibold text-white">AI</div>
       </div>
@@ -62,7 +62,7 @@ export function AgentDemo() {
       <div className="grid grid-cols-[1fr_170px] text-[11px]">
         {/* page: results build in */}
         <div className="border-r border-line p-3">
-          <div className="mb-2 font-semibold text-ink-primary">SAM.gov · Opportunities</div>
+          <div className="mb-2 font-semibold text-ink-primary">Browser page</div>
           <ul className="space-y-1.5">
             {ROWS.map((r, i) => (
               <li
@@ -74,9 +74,7 @@ export function AgentDemo() {
                 }`}
               >
                 <div className="font-medium text-ink-primary">{r[0]}</div>
-                <div className="text-[10px] text-ink-secondary">
-                  {r[1]} · {r[3]} · Deadline {r[2]}
-                </div>
+                <div className="text-[10px] text-ink-secondary">{r[1]}</div>
               </li>
             ))}
           </ul>
@@ -86,7 +84,7 @@ export function AgentDemo() {
         <div className="bg-surface-muted p-2">
           <div className="text-[10px] font-semibold text-ink-primary">AI agent</div>
           <div className="mt-1 rounded bg-primary px-2 py-1 text-[10px] leading-snug text-white">
-            Find youth-workforce grants
+            Summarize this page and tell me what matters
           </div>
           <div className="mt-2 space-y-1 font-mono text-[9.5px] leading-relaxed text-ink-secondary">
             {STEPS.map((s, i) => (
@@ -111,7 +109,7 @@ export function AgentDemo() {
             <span
               className={`h-1.5 w-1.5 rounded-full ${working ? 'animate-pulse bg-accent' : 'bg-emerald-500'}`}
             />
-            {working ? 'working…' : `${ROWS.length} matches`}
+            {working ? 'working…' : `${ROWS.length} outputs`}
           </div>
         </div>
       </div>

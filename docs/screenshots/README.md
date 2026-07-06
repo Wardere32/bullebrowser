@@ -6,13 +6,13 @@ are 2× DPR (retina) renders so they stay crisp at any embedding size.
 
 ## `desktop-grant-scanner.png`
 
-The desktop application mid-task: the **Grant Scanner** preset skill is
-running against SAM.gov in the active tab while the AI panel on the
-right shows the user prompt, the agent's plan, a live tool-call
-activity feed (`navigate → type → click → wait_for → extract`), and an
-in-progress results table. The orange "Agent is working" pill with the
-Stop button lives in the top bar; the AI panel toggle, profile menu,
-tabs, address bar, and back/forward/reload controls are all visible.
+The desktop application mid-task: the assistant is working against a live
+page in the active tab while the AI panel on the right shows the user
+prompt, the agent's plan, a live tool-call activity feed (`navigate → type
+→ click → wait_for → extract`), and an in-progress results table. The
+orange "Agent is working" pill with the Stop button lives in the top bar;
+the assistant launcher, profile menu, tabs, address bar, and
+back/forward/reload controls are all visible.
 
 ![BulleBrowser desktop UI running the Grant Scanner skill](./desktop-grant-scanner.png)
 

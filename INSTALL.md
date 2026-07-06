@@ -74,23 +74,21 @@ Get-FileHash .\BulleBrowser-Setup-*.exe -Algorithm SHA256
 
 ---
 
-## 4. Turn on the AI agent (bring your own key)
+## 4. Open the assistant
 
-BulleBrowser uses **your own Anthropic API key** — your prompts go straight
-to Anthropic, never to Bulle Consulting.
+BulleBrowser can run without a provider key. If you later want external
+synthesis, add a supported key from your AI provider account.
 
-1. Get a key at <https://console.anthropic.com> → **API Keys** (it starts
-   with `sk-ant-`).
-2. In BulleBrowser, open the **profile menu** (top-right) → **Settings**.
-3. Paste your key into **Anthropic API key** → **Save**. It's stored
-   encrypted in your operating system's keychain.
-4. Open the **AI panel** (the **AI** button, or `Ctrl/Cmd + Shift + A`).
+1. Open the **assistant panel** (the **Your Assistant** button, or
+   `Ctrl/Cmd + Shift + A`).
+2. Choose a preset skill if you want a guided workflow, or just describe
+   what you need in plain language.
+3. The agent will browse the live tab and return a result summary.
 
-You're ready. Try a preset **Skill** from the dropdown:
-- **Grant scanner** — give it keywords; it searches SAM.gov & Grants.gov and
-  returns a comparison table.
-- **RFP comparator** — paste 2–4 RFP links for a side-by-side breakdown.
-- **Compliance review** — drop a document; it flags EEO / FERPA / ADA issues.
+Preset **Skills**:
+- **Page assistant** — read and summarize the current page.
+- **Site navigator** — open a site, find the control, and complete the requested action.
+- **Workflow automator** — coordinate repeatable multi-step browser tasks.
 
 ---
 
@@ -113,7 +111,7 @@ You're ready. Try a preset **Skill** from the dropdown:
 | Mac: "can't be opened" | Right-click → Open → Open (step 2 above). |
 | Mac: "is damaged" | Run the `xattr -dr` command above. |
 | Windows: SmartScreen blocks it | More info → Run anyway. |
-| AI panel says "add an API key" | Settings → paste your `sk-ant-…` key. |
+| AI panel asks for a key | That is optional; continue using the local assistant, or add a key later in Settings if you want external synthesis. |
 | Agent can't read a page | Some PDFs/non-HTML pages aren't readable; paste the text or use an HTML version. |
 | Updates | BulleBrowser checks GitHub Releases and updates itself on the next launch. |
 

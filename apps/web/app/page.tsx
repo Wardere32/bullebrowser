@@ -5,19 +5,19 @@ import { AgentDemo } from '@/components/AgentDemo';
 
 const SKILLS = [
   {
-    title: 'Grant scanner',
-    lede: 'Scan funding without the tab-juggling.',
-    body: 'Searches SAM.gov and Grants.gov, follows each listing into its detail page, and returns a table sorted by deadline — award ceilings and links included.',
+    title: 'Page assistant',
+    lede: 'Read and summarize what is on screen.',
+    body: 'Ask it to read a page, lift the important points, and give you a concise answer with citations.',
   },
   {
-    title: 'RFP comparator',
-    lede: 'Go / no-go in minutes.',
-    body: 'Paste 2–4 RFP links. It reads each end to end and lays deadline, scope, eligibility, contract value, and evaluation criteria side by side.',
+    title: 'Site navigator',
+    lede: 'Handle a task inside a live website.',
+    body: 'Tell it where to go and what to do. It opens the page, finds the control, and completes the action.',
   },
   {
-    title: 'Compliance review',
-    lede: 'Catch the gaps before review does.',
-    body: 'Flags clauses against EEO, FERPA, and ADA — plus any checklist items you add — and quotes each one with its section reference.',
+    title: 'Workflow automator',
+    lede: 'Coordinate multi-step browser tasks.',
+    body: 'Use it for repeatable sequences across tabs: compare pages, gather details, and return a clean summary.',
   },
 ];
 
@@ -33,12 +33,11 @@ export default function HomePage() {
               Agentic AI · By {product.vendor}
             </div>
             <h1 className="text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
-              The browser that does the work.
+              The browser that navigates for you.
             </h1>
             <p className="mt-6 max-w-md text-lg leading-relaxed text-ink-inverse/70">
-              An AI agent that researches grants, compares RFPs, and reviews
-              compliance — and works whatever else you ask, right inside your
-              browser.
+              An AI agent that reads pages, completes browser tasks, and works
+              whatever else you ask right inside your browser.
             </p>
             <div className="mt-10 flex flex-wrap items-center gap-5">
               <DownloadButton />
@@ -61,9 +60,8 @@ export default function HomePage() {
         </h2>
         <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-ink-secondary">
           Not a chatbot bolted onto a sidebar. {product.name} is purpose-built
-          for the grant, RFP, and compliance work {product.vendor} does every
-          day. Three flagship skills lead the way — and the agent takes on much
-          more on request.
+          for general browser automation. Three flagship skills lead the way —
+          and the agent takes on much more on request.
         </p>
         <div className="mt-14 grid gap-x-12 gap-y-10 sm:grid-cols-3">
           {SKILLS.map((s) => (
@@ -93,9 +91,9 @@ export default function HomePage() {
             Your data stays yours.
           </h2>
           <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-ink-secondary">
-            Bring your own key. Prompts go directly through your configured
-            AI provider account from your device. History and conversations
-            stay on your device. No telemetry.
+            Bring your own key if you want external synthesis. Prompts go
+            directly through your configured AI provider account from your
+            device. History and conversations stay on your device. No telemetry.
           </p>
           <div className="mt-10 flex justify-center">
             <DownloadButton />

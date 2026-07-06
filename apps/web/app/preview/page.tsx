@@ -15,13 +15,13 @@ const SHOTS = [
     src: '/screenshots/first-open.png',
     title: 'First launch',
     caption:
-      'A fresh tab on the start page with the AI panel open — the welcome state introduces the three flagship skills, and the composer is ready for any task you type.',
+      'A fresh tab on the start page with the assistant panel open — the welcome state introduces the three flagship skills, and the composer is ready for any task you type.',
   },
   {
     src: '/screenshots/grant-scanner.png',
-    title: 'The agent at work — Grant scanner',
+    title: 'The agent at work — Page assistant',
     caption:
-      'The agent running live against SAM.gov: your prompt, its plan, the step-by-step tool feed (navigate → type → click → wait_for → extract), and an in-progress results table — with a Stop button always available.',
+      'The agent running live against a page: your prompt, its plan, the step-by-step tool feed (navigate → type → click → wait_for → extract), and an in-progress results table — with a Stop button always available.',
   },
 ];
 
@@ -52,8 +52,8 @@ export default function PreviewPage() {
       <div className="mt-14 rounded-lg border border-line bg-surface-muted p-6">
         <div className="text-lg font-semibold">Ready to try it yourself?</div>
         <p className="mt-1 text-sm text-ink-secondary">
-          Free download for macOS, Windows, and Linux. Bring your own BulleBrowser AI
-          API key.
+          Free download for macOS, Windows, and Linux. Bring your own AI key if
+          you want external synthesis later.
         </p>
         <div className="mt-4">
           <DownloadButton />

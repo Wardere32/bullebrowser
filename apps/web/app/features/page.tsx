@@ -19,19 +19,19 @@ const TOOLS = [
 
 const SKILLS = [
   {
-    title: 'Grant scanner',
-    lede: 'Find funding without the tab-juggling.',
-    body: 'Give it keywords. It searches SAM.gov and Grants.gov, follows listings into detail pages, and returns a comparison table sorted by deadline — with award ceilings and links.',
+    title: 'Page assistant',
+    lede: 'Read and summarize what is on screen.',
+    body: 'Give it a page or task. It reads the live tab and returns a concise answer with citations.',
   },
   {
-    title: 'RFP comparator',
-    lede: 'Go/no-go in minutes, not hours.',
-    body: 'Paste 2–4 RFP links. It reads each end to end and hands back a side-by-side of deadline, scope, eligibility, contract value, and evaluation criteria.',
+    title: 'Site navigator',
+    lede: 'Handle a task inside a live website.',
+    body: 'Open a site, find the control, and complete the requested browser action.',
   },
   {
-    title: 'Compliance review',
-    lede: 'Catch the gaps before review does.',
-    body: 'Drop a document. It flags clauses against EEO, FERPA, and ADA — plus any checklist items you add — and quotes each clause with its section reference.',
+    title: 'Workflow automator',
+    lede: 'Coordinate repeatable browser work.',
+    body: 'Use it for multi-step sequences across tabs: compare pages, gather details, and return a clean summary.',
   },
 ];
 
@@ -65,7 +65,6 @@ function Section({
 export default function FeaturesPage() {
   return (
     <>
-      {/* Intro */}
       <section className="bg-surface-dark text-ink-inverse">
         <div className="mx-auto max-w-5xl px-6 py-24 md:py-32">
           <h1 className="max-w-3xl text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
@@ -80,7 +79,6 @@ export default function FeaturesPage() {
         </div>
       </section>
 
-      {/* Capabilities */}
       <Section eyebrow="Capabilities" title="It works the live web, not a stale index.">
         <p className="max-w-2xl text-[15px] leading-relaxed text-ink-secondary">
           The agent acts on the active tab — same pages, same logins, same
@@ -96,8 +94,7 @@ export default function FeaturesPage() {
         </div>
       </Section>
 
-      {/* Skills */}
-      <Section eyebrow="Agentic skills" title="Three flagship skills — and a general agent for the rest.">
+      <Section eyebrow="Skills" title="Three flagship skills — and a general agent for the rest.">
         <div className="grid gap-10 md:grid-cols-3">
           {SKILLS.map((s) => (
             <div key={s.title}>
@@ -114,7 +111,6 @@ export default function FeaturesPage() {
         </p>
       </Section>
 
-      {/* Control & trust */}
       <Section eyebrow="Control & trust" title="Powerful, but never on autopilot.">
         <div className="grid gap-x-10 gap-y-8 sm:grid-cols-2">
           {CONTROLS.map(([t, d]) => (
@@ -126,7 +122,6 @@ export default function FeaturesPage() {
         </div>
       </Section>
 
-      {/* Privacy */}
       <Section eyebrow="Privacy" title="Bring your own key. Keep your own data.">
         <ul className="max-w-2xl space-y-3 text-[15px] leading-relaxed text-ink-secondary">
           <li>Your prompts go directly through your configured provider from your device.</li>
@@ -136,7 +131,6 @@ export default function FeaturesPage() {
         </ul>
       </Section>
 
-      {/* CTA */}
       <section className="border-t border-line bg-surface-muted">
         <div className="mx-auto max-w-3xl px-6 py-24 text-center">
           <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">Put the agent to work.</h2>
