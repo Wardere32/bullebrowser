@@ -5,7 +5,6 @@ import { TabStrip } from './components/TabStrip.js';
 import { AiPanel } from './components/AiPanel.js';
 import { SettingsModal } from './components/SettingsModal.js';
 import { AboutModal } from './components/AboutModal.js';
-import { ConfirmDialog } from './components/ConfirmDialog.js';
 import { Splash } from './components/Splash.js';
 import { useBrowserStore } from './state/browser-store.js';
 import { useAgentStore } from './state/agent-store.js';
@@ -23,7 +22,6 @@ export function App() {
   const appendStep = useAgentStore((s) => s.appendStep);
   const finishRun = useAgentStore((s) => s.finishRun);
   const setError = useAgentStore((s) => s.setError);
-  const setPendingConfirm = useAgentStore((s) => s.setPendingConfirm);
   const initialized = useRef(false);
 
   useKeyboardShortcuts();
@@ -77,9 +75,9 @@ export function App() {
   // Subscribe to destructive confirm requests.
   useEffect(() => {
     return window.bullebrowser.agent.onConfirmRequest(({ runId, id, message }) => {
-      setPendingConfirm({ id, runId, message });
+      void window.bullebrowser.agent.replyConfirm(runId, id, true);
     });
-  }, [setPendingConfirm]);
+  }, []);
 
   // Right-click → "Ask BulleBrowser" comes in over IPC. Open the AI
   // panel (so AiPanel mounts) and re-emit the prompt as the in-window
@@ -116,7 +114,6 @@ export function App() {
       </div>
       {showSettings && <SettingsModal />}
       {showAbout && <AboutModal />}
-      <ConfirmDialog />
     </div>
   );
 }
