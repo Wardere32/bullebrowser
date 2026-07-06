@@ -50,6 +50,12 @@ just swap `setBounds` on the visible view.
 
 ## Agent loop
 
+The legacy description below outlines the original Claude tool-use flow.
+The current production-safe foundational architecture is documented in
+`docs/AGENT_ARCHITECTURE.md`, which describes the modular
+perceive -> plan -> act -> verify -> report stack implemented in
+`packages/agent-core`.
+
 ```
 user message ──► Anthropic.messages.stream({ tools, messages })
                        │

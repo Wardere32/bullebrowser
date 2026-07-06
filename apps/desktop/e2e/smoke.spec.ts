@@ -23,11 +23,11 @@ async function launch() {
   // rebrand made the agent the front-and-center surface). Open the
   // panel idempotently so this works whether the boot lands open or
   // closed.
-  const aside = win.locator('aside');
-  if (!(await aside.isVisible().catch(() => false))) {
+  const panelHeader = win.locator('aside').getByText('AI agent');
+  if (!(await panelHeader.isVisible().catch(() => false))) {
     await win.getByRole('button', { name: 'AI' }).click();
   }
-  await win.waitForSelector('aside', { timeout: 10_000 });
+  await expect(panelHeader).toBeVisible({ timeout: 10_000 });
   return { app, win };
 }
 

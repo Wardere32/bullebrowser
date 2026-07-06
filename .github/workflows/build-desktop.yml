@@ -5,9 +5,23 @@ on:
     tags:
       - 'v*.*.*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (semver, e.g. 0.2.0) for manual publish.'
+        required: false
+        type: string
+      publish_release:
+        description: 'Publish GitHub Release after build artifacts complete.'
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: write
+
+concurrency:
+  group: build-desktop-${{ github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -33,16 +47,39 @@ jobs:
           node-version: '20'
           cache: 'pnpm'
 
+      - name: Validate manual release inputs
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION='${{ github.event.inputs.version }}'
+          PUBLISH='${{ github.event.inputs.publish_release }}'
+
+          if [[ "$PUBLISH" == "true" && -z "$VERSION" ]]; then
+            echo "publish_release=true requires a non-empty version input"
+            exit 1
+          fi
+
+          if [[ -n "$VERSION" && ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "version input must be semver without leading v (example: 0.2.0)"
+            exit 1
+          fi
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Stamp version from tag
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.version != '')
         shell: bash
         run: |
           set -e
-          VERSION="${GITHUB_REF_NAME#v}"
-          echo "Stamping all package.json files to $VERSION (from tag $GITHUB_REF_NAME)"
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+            echo "Stamping all package.json files to $VERSION (from tag $GITHUB_REF_NAME)"
+          else
+            VERSION="${{ github.event.inputs.version }}"
+            echo "Stamping all package.json files to $VERSION (from workflow_dispatch input)"
+          fi
           node -e '
             const fs = require("fs");
             const v = process.argv[1];
@@ -194,11 +231,21 @@ jobs:
     name: Publish GitHub Release
     needs: build
     runs-on: ubuntu-22.04
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_release == 'true' && github.event.inputs.version != '')
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Resolve release tag
+        id: release_meta
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=v${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: actions/download-artifact@v4
         with:
@@ -225,13 +272,15 @@ jobs:
             echo ""
             git log --pretty=format:'- %s' "$range" | grep -E '^- (feat|fix|perf|refactor|docs|chore)\(' || echo "- (no Conventional Commits in range)"
             echo ""
-            echo "Full diff: ${last_tag:-(initial)}...${GITHUB_REF_NAME}"
+            echo "Full diff: ${last_tag:-(initial)}...${{ steps.release_meta.outputs.tag }}"
           } > notes.md
           echo "path=notes.md" >> $GITHUB_OUTPUT
 
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.release_meta.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           files: release-assets/*
           body_path: ${{ steps.notes.outputs.path }}
           generate_release_notes: false

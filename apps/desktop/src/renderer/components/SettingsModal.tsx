@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ClaudeModelId } from '@bullebrowser/agent-core';
 import { useBrowserStore } from '../state/browser-store.js';
+import { useInputActivity } from '../hooks/useInputActivity.js';
 import type { AppSettings } from '../../shared/ipc.js';
 import { Modal } from './Modal.js';
 
@@ -19,6 +20,8 @@ export function SettingsModal() {
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [keyError, setKeyError] = useState<string | null>(null);
+  const apiKeyActivity = useInputActivity({ disabled: hasKey || saving });
+  const checklistActivity = useInputActivity();
 
   useEffect(() => {
     void (async () => {
@@ -93,16 +96,26 @@ export function SettingsModal() {
           ) : (
             <div className="mt-2 space-y-2">
               <div className="flex gap-2">
-                <input
-                  type="password"
-                  value={keyDraft}
-                  onChange={(e) => {
-                    setKeyDraft(e.target.value);
-                    if (keyError) setKeyError(null);
-                  }}
-                  placeholder="sk-ant-…"
-                  className="flex-1 rounded border border-line px-2 py-1.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                />
+                <div
+                  className={`flex-1 prompt-input-shell prompt-input-shell--${apiKeyActivity.state}`}
+                  data-activity-state={apiKeyActivity.state}
+                >
+                  <input
+                    type="password"
+                    value={keyDraft}
+                    onChange={(e) => {
+                      setKeyDraft(e.target.value);
+                      apiKeyActivity.onInputActivity();
+                      if (keyError) setKeyError(null);
+                    }}
+                    onPaste={() => apiKeyActivity.onInputActivity()}
+                    onFocus={apiKeyActivity.onFocus}
+                    onBlur={apiKeyActivity.onBlur}
+                    placeholder="sk-ant-…"
+                    className="prompt-input-field prompt-input-field--singleline"
+                    disabled={saving}
+                  />
+                </div>
                 <button
                   type="button"
                   onClick={saveKey}
@@ -163,14 +176,23 @@ export function SettingsModal() {
           <p className="mt-1 text-xs text-ink-secondary">
             Items the Compliance Review skill checks for. One per line.
           </p>
-          <textarea
-            value={settings.complianceChecklist.join('\n')}
-            onChange={(e) =>
-              update({ complianceChecklist: e.target.value.split('\n').filter(Boolean) })
-            }
-            rows={5}
-            className="mt-2 w-full rounded border border-line p-2 font-mono text-xs"
-          />
+          <div
+            className={`mt-2 prompt-input-shell prompt-input-shell--${checklistActivity.state}`}
+            data-activity-state={checklistActivity.state}
+          >
+            <textarea
+              value={settings.complianceChecklist.join('\n')}
+              onChange={(e) => {
+                checklistActivity.onInputActivity();
+                void update({ complianceChecklist: e.target.value.split('\n').filter(Boolean) });
+              }}
+              onPaste={() => checklistActivity.onInputActivity()}
+              onFocus={checklistActivity.onFocus}
+              onBlur={checklistActivity.onBlur}
+              rows={5}
+              className="prompt-input-field w-full font-mono text-xs"
+            />
+          </div>
         </div>
 
         <div>

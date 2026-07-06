@@ -1,197 +1,146 @@
-// The agent loop. Receives messages, calls Anthropic with tool-use,
-// dispatches tool calls into the desktop runtime via ToolContext, and
-// streams steps back to the renderer through onStep.
-
-// Type-only default import: `Anthropic.MessageParam`, `Anthropic.Tool`, etc.
-// are members of the default export's merged namespace, not top-level module
-// exports — so `import type * as` would not resolve them. `import type` keeps
-// this erased at runtime; the SDK value is loaded dynamically inside runAgent.
-import type Anthropic from '@anthropic-ai/sdk';
+import { executePlan } from './executor.js';
+import { SessionMemoryStore } from './memory.js';
+import { planTask } from './planner.js';
+import { PrivacyPolicyEngine } from './policy.js';
+import { AnthropicSynthesisProvider, LocalSynthesisProvider } from './provider.js';
+import { retrieveContext } from './retrieval.js';
+import { AuditLogger } from './audit.js';
 import {
   MAX_TOOL_CALLS_PER_TASK,
-  type AgentStepHandler,
-  type ToolContext,
+  type AgentInput,
+  type ClaudeModelId,
+  type ExecutionPlan,
 } from './types.js';
-import { getTool, toAnthropicTools } from './tools/index.js';
-
-export type ClaudeModelId =
-  | 'claude-opus-4-7'
-  | 'claude-sonnet-4-6'
-  | 'claude-haiku-4-5-20251001';
 
 export const DEFAULT_MODEL: ClaudeModelId = 'claude-opus-4-7';
 
-export interface AgentInput {
-  apiKey: string;
-  model: ClaudeModelId;
-  systemPrompt: string;
-  history: { role: 'user' | 'assistant'; content: string }[];
-  userMessage: string;
-  context: ToolContext;
-  onStep: AgentStepHandler;
+function shouldUseExternalProvider(): boolean {
+  return process.env.BULLE_AGENT_USE_EXTERNAL_PROVIDER === '1';
 }
 
-type MessageParam = Anthropic.MessageParam;
-type ContentBlockParam = Anthropic.ContentBlockParam;
-type ToolUseBlock = Anthropic.ToolUseBlock;
+function formatPlan(plan: ExecutionPlan): string {
+  const lines = [
+    `Goal: ${plan.goal}`,
+    `Why: ${plan.rationale}`,
+    'Steps:',
+    ...plan.steps.map((s, i) => `${i + 1}. ${s.toolName} - ${s.expected}`),
+  ];
+  return lines.join('\n');
+}
+
+function makeFinalReport(params: {
+  plan: ExecutionPlan;
+  results: Array<{ ok: boolean; output?: unknown; reason?: string }>;
+  providerText: string;
+  url?: string;
+}): string {
+  const successCount = params.results.filter((r) => r.ok).length;
+  const failed = params.results.find((r) => !r.ok);
+
+  const lines: string[] = [];
+  lines.push('Execution Report');
+  lines.push('');
+  lines.push(`Plan goal: ${params.plan.goal}`);
+  lines.push(`Completed steps: ${successCount}/${params.plan.steps.length}`);
+  if (failed?.reason) lines.push(`Failure: ${failed.reason}`);
+  if (params.url) lines.push(`Source: ${params.url}`);
+  lines.push('');
+  lines.push(params.providerText.trim());
+
+  return lines.join('\n');
+}
 
 export async function runAgent(input: AgentInput): Promise<string> {
-  const { default: AnthropicClient } = await import('@anthropic-ai/sdk');
-  const client = new AnthropicClient({ apiKey: input.apiKey });
-  // The converter always emits {type: 'object', properties, required}, which
-  // matches Anthropic.Tool['input_schema'], but TS can't narrow Record<string,
-  // unknown> to that — so we cross the boundary with a single cast here.
-  const tools = toAnthropicTools() as unknown as Anthropic.Tool[];
+  const policy = new PrivacyPolicyEngine();
+  const memory = new SessionMemoryStore();
+  const audit = new AuditLogger();
 
-  const messages: MessageParam[] = [
-    ...input.history.map(
-      (m): MessageParam => ({ role: m.role, content: m.content }),
-    ),
-    { role: 'user', content: input.userMessage },
-  ];
+  if (input.context.signal.aborted) {
+    input.onStep({ type: 'error', detail: 'Cancelled by user.' });
+    throw new Error('cancelled');
+  }
 
-  let toolCallCount = 0;
-  let finalText = '';
+  input.onStep({ type: 'thinking', detail: 'Perceiving browser context…' });
+  audit.add('perceive', 'Starting contextual retrieval');
 
-  while (toolCallCount <= MAX_TOOL_CALLS_PER_TASK) {
-    if (input.context.signal.aborted) {
-      input.onStep({ type: 'error', detail: 'Cancelled by user.' });
-      throw new Error('cancelled');
-    }
+  const retrieved = await retrieveContext(input.context, memory);
+  memory.put('last_url', retrieved.url, 15 * 60 * 1000);
+  memory.put('last_title', retrieved.title, 15 * 60 * 1000);
 
-    input.onStep({ type: 'thinking', detail: 'Thinking…' });
+  input.onStep({ type: 'thinking', detail: 'Planning actions…' });
+  const plan = planTask({
+    userMessage: input.userMessage,
+    currentUrl: retrieved.url,
+  });
 
-    const response = await client.messages.create(
-      {
-        model: input.model,
-        max_tokens: 4096,
-        system: input.systemPrompt,
-        tools: tools as unknown as Anthropic.Messages.ToolUnion[],
-        messages: messages as unknown as Anthropic.Messages.MessageParam[],
-      },
-      { signal: input.context.signal },
-    );
+  if (plan.steps.length > MAX_TOOL_CALLS_PER_TASK) {
+    throw new Error(`Plan exceeds max tool calls (${MAX_TOOL_CALLS_PER_TASK}).`);
+  }
 
-    const toolUses = response.content.filter(
-      (b): b is ToolUseBlock => b.type === 'tool_use',
-    );
-    const textBlocks = response.content.filter(
-      (b): b is Anthropic.TextBlock => b.type === 'text',
-    );
+  input.onStep({ type: 'text', detail: formatPlan(plan) });
+  audit.add('plan', 'Plan generated', plan);
 
-    for (const t of textBlocks) {
-      if (t.text) {
-        finalText += (finalText ? '\n\n' : '') + t.text;
-        input.onStep({ type: 'text', detail: t.text });
-      }
-    }
-
-    if (response.stop_reason !== 'tool_use' || toolUses.length === 0) {
-      input.onStep({ type: 'done' });
-      return finalText;
-    }
-
-    // Echo the assistant's tool_use blocks back into the conversation,
-    // then append the tool_result blocks for the next round.
-    messages.push({
-      role: 'assistant',
-      content: response.content as ContentBlockParam[],
-    });
-    const toolResults: ContentBlockParam[] = [];
-
-    for (const tu of toolUses) {
-      if (input.context.signal.aborted) throw new Error('cancelled');
-      toolCallCount += 1;
-      if (toolCallCount > MAX_TOOL_CALLS_PER_TASK) {
-        input.onStep({
-          type: 'error',
-          detail: `Reached the ${MAX_TOOL_CALLS_PER_TASK} tool-call limit. Stopping.`,
-        });
-        return finalText;
-      }
-      const tool = getTool(tu.name);
+  input.onStep({ type: 'thinking', detail: 'Executing plan…' });
+  const results = await executePlan(plan, input.context, policy, audit, (event) => {
+    if (event.type === 'tool_call') {
       input.onStep({
         type: 'tool_call',
-        toolName: tu.name as never,
-        detail: describeToolCall(tu.name, tu.input),
-        data: tu.input,
+        toolName: event.toolName,
+        detail: event.detail,
+        data: policy.redact(event.data),
       });
-
-      let resultContent: unknown;
-      let isError = false;
-      try {
-        if (!tool) throw new Error(`Unknown tool: ${tu.name}`);
-        if (tool.destructive) {
-          const ok = await input.context.runtime.confirmDestructive(
-            describeToolCall(tu.name, tu.input),
-          );
-          if (!ok) throw new Error('User declined the destructive action.');
-        }
-        const parsed = tool.inputSchema.parse(tu.input ?? {});
-        const out = await tool.execute(parsed, input.context);
-        resultContent = out;
-        input.onStep({ type: 'tool_result', toolName: tu.name as never, data: out });
-      } catch (err) {
-        isError = true;
-        resultContent =
-          err instanceof Error ? err.message : 'Unknown error executing tool';
-        input.onStep({ type: 'error', toolName: tu.name as never, detail: String(resultContent) });
-      }
-      toolResults.push({
-        type: 'tool_result',
-        tool_use_id: tu.id,
-        content: toToolResultContent(resultContent),
-        is_error: isError,
-      });
+      return;
     }
+    if (event.type === 'tool_result') {
+      input.onStep({
+        type: 'tool_result',
+        toolName: event.toolName,
+        data: policy.redact(event.data),
+      });
+      return;
+    }
+    if (event.type === 'error') {
+      input.onStep({ type: 'error', toolName: event.toolName, detail: event.detail });
+      return;
+    }
+    input.onStep({ type: 'thinking', detail: event.detail });
+  });
 
-    messages.push({ role: 'user', content: toolResults });
+  const facts = results.filter((r) => r.ok).map((r) => r.output);
+  const externalDecision = policy.allowExternalProvider({
+    url: retrieved.url,
+    text: retrieved.textSnippet,
+  });
+
+  const provider =
+    shouldUseExternalProvider() && externalDecision.allowed
+      ? new AnthropicSynthesisProvider()
+      : new LocalSynthesisProvider();
+
+  if (provider.id === 'anthropic' && !externalDecision.allowed) {
+    audit.add('policy', 'External synthesis blocked', externalDecision.reason);
   }
+
+  input.onStep({ type: 'thinking', detail: 'Preparing final report…' });
+  const providerText = await provider.summarize({
+    model: input.model,
+    goal: plan.goal,
+    facts,
+    apiKey: input.apiKey,
+  });
+
+  const report = makeFinalReport({
+    plan,
+    results,
+    providerText,
+    url: retrieved.url,
+  });
+
+  audit.add('report', 'Final report generated', {
+    provider: provider.id,
+    records: audit.all().length,
+  });
 
   input.onStep({ type: 'done' });
-  return finalText;
-}
-
-/**
- * Shape a tool's return value into what the Anthropic API accepts for
- * `tool_result.content`: a string or an array of content blocks — never a
- * bare object. Screenshots are returned as an image block so the model can
- * actually see them; everything else is JSON-stringified.
- */
-function toToolResultContent(
-  value: unknown,
-): string | Array<Anthropic.TextBlockParam | Anthropic.ImageBlockParam> {
-  if (typeof value === 'string') return value;
-  if (
-    value !== null &&
-    typeof value === 'object' &&
-    'pngBase64' in value &&
-    typeof (value as { pngBase64: unknown }).pngBase64 === 'string'
-  ) {
-    return [
-      {
-        type: 'image',
-        source: {
-          type: 'base64',
-          media_type: 'image/png',
-          data: (value as { pngBase64: string }).pngBase64,
-        },
-      },
-    ];
-  }
-  return JSON.stringify(value);
-}
-
-function describeToolCall(name: string, input: unknown): string {
-  if (!input || typeof input !== 'object') return name;
-  const fields = Object.entries(input as Record<string, unknown>)
-    .map(([k, v]) => `${k}=${formatValue(v)}`)
-    .join(', ');
-  return `${name}(${fields})`;
-}
-
-function formatValue(v: unknown): string {
-  if (typeof v === 'string') return v.length > 60 ? `${v.slice(0, 57)}…` : v;
-  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
-  return JSON.stringify(v).slice(0, 60);
+  return report;
 }

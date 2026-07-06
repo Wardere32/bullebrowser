@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useBrowserStore, activeTabSelector } from '../state/browser-store.js';
 import { useAgentStore } from '../state/agent-store.js';
 import { AGENT_PROMPT_EVENT, parseAddressBarInput } from '../lib/url.js';
+import { useInputActivity } from '../hooks/useInputActivity.js';
 import logo from '@bullebrowser/brand-tokens/logo.svg';
 
 export function TopBar() {
@@ -18,6 +19,7 @@ export function TopBar() {
   const [draftUrl, setDraftUrl] = useState('');
   const [profileOpen, setProfileOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const addressActivity = useInputActivity();
 
   useEffect(() => {
     setDraftUrl(active?.url ?? '');
@@ -80,15 +82,26 @@ export function TopBar() {
       </div>
 
       <form onSubmit={submit} className="no-drag flex-1">
-        <input
-          ref={inputRef}
-          type="text"
-          value={draftUrl}
-          onChange={(e) => setDraftUrl(e.target.value)}
-          placeholder="Search or enter address"
-          aria-label="Address bar"
-          className="h-7 w-full rounded-md bg-white/10 px-3 text-sm text-ink-inverse placeholder-ink-inverse/50 outline-none ring-1 ring-white/10 focus:ring-primary"
-        />
+        <div
+          className={`h-7 prompt-input-shell prompt-input-shell--dark prompt-input-shell--${addressActivity.state}`}
+          data-activity-state={addressActivity.state}
+        >
+          <input
+            ref={inputRef}
+            type="text"
+            value={draftUrl}
+            onChange={(e) => {
+              setDraftUrl(e.target.value);
+              addressActivity.onInputActivity();
+            }}
+            onPaste={() => addressActivity.onInputActivity()}
+            onFocus={addressActivity.onFocus}
+            onBlur={addressActivity.onBlur}
+            placeholder="Search or enter address"
+            aria-label="Address bar"
+            className="prompt-input-field prompt-input-field--singleline prompt-input-field--dark"
+          />
+        </div>
       </form>
 
       {status === 'running' && (

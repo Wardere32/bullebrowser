@@ -42,6 +42,140 @@ textarea {
   -webkit-app-region: no-drag;
 }
 
+.prompt-input-shell {
+  position: relative;
+  overflow: visible;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  transition:
+    border-color 140ms ease,
+    box-shadow 180ms ease,
+    background-color 140ms ease;
+}
+
+.prompt-input-shell::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 10px;
+  pointer-events: none;
+  opacity: 0;
+  box-shadow:
+    0 0 0 1px rgba(37, 99, 235, 0.22),
+    0 0 16px rgba(37, 99, 235, 0.2);
+  transition:
+    opacity 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.prompt-input-shell--focus {
+  border-color: #3b82f6;
+}
+
+.prompt-input-shell--focus::after {
+  opacity: 0.46;
+}
+
+.prompt-input-shell--typing {
+  border-color: #2563eb;
+}
+
+.prompt-input-shell--typing::after {
+  opacity: 1;
+  animation: prompt-halo-pulse 1.45s ease-in-out infinite;
+}
+
+.prompt-input-shell--cooldown {
+  border-color: #3b82f6;
+}
+
+.prompt-input-shell--cooldown::after {
+  opacity: 0.58;
+}
+
+.prompt-input-shell--disabled {
+  border-color: #d6dee8;
+  background: #f8fafc;
+}
+
+.prompt-input-shell--disabled::after {
+  opacity: 0;
+  animation: none;
+}
+
+.prompt-input-shell--dark {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.prompt-input-shell--dark.prompt-input-shell--focus,
+.prompt-input-shell--dark.prompt-input-shell--cooldown {
+  border-color: rgba(59, 130, 246, 0.72);
+}
+
+.prompt-input-shell--dark.prompt-input-shell--typing {
+  border-color: rgba(37, 99, 235, 0.95);
+}
+
+.prompt-input-field {
+  width: 100%;
+  resize: none;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #0f172a;
+  padding: 8px;
+  font-size: 14px;
+  outline: none;
+}
+
+.prompt-input-field:disabled {
+  cursor: not-allowed;
+}
+
+.prompt-input-field--singleline {
+  height: 100%;
+  padding: 0 12px;
+}
+
+.prompt-input-field--dark {
+  color: #f8fafc;
+}
+
+.prompt-input-field--dark::placeholder {
+  color: rgba(248, 250, 252, 0.6);
+}
+
+@keyframes prompt-halo-pulse {
+  0% {
+    box-shadow:
+      0 0 0 1px rgba(37, 99, 235, 0.2),
+      0 0 12px rgba(37, 99, 235, 0.18);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(37, 99, 235, 0.45),
+      0 0 20px rgba(37, 99, 235, 0.33);
+  }
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(37, 99, 235, 0.2),
+      0 0 12px rgba(37, 99, 235, 0.18);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prompt-input-shell,
+  .prompt-input-shell::after {
+    transition: none;
+  }
+
+  .prompt-input-shell--typing::after {
+    animation: none;
+  }
+}
+
 /* Markdown styling for the AI panel chat bubbles */
 .md-prose {
   font-size: 13.5px;

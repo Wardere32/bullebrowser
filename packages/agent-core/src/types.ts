@@ -1,11 +1,23 @@
-// Shared types used by the agent loop and tool implementations.
-// The actual tool runtime is injected by the desktop app's main process,
-// so this package stays free of any Electron imports.
-
 import type { z } from 'zod';
 
+export type ClaudeModelId =
+  | 'claude-opus-4-7'
+  | 'claude-sonnet-4-6'
+  | 'claude-haiku-4-5-20251001';
+
 export type ToolName =
+  | 'getActiveTab'
+  | 'listTabs'
+  | 'getPageText'
+  | 'getPageMetadata'
+  | 'getSelection'
+  | 'listLinks'
+  | 'queryDom'
+  | 'summarizePage'
+  | 'extractStructuredData'
   | 'navigate'
+  | 'clickElement'
+  | 'typeIntoField'
   | 'read_page'
   | 'click'
   | 'type'
@@ -40,7 +52,6 @@ export interface TabSummary {
 export interface ToolContext {
   activeTabId: string;
   signal: AbortSignal;
-  // Implemented by the desktop main process; agent-core consumes it abstractly.
   runtime: ToolRuntime;
 }
 
@@ -73,8 +84,12 @@ export interface ToolRuntime {
     tabId: string,
     condition: { selector?: string; networkIdle?: boolean; timeoutMs?: number },
   ): Promise<{ matched: boolean }>;
-  /** Ask the user to confirm a destructive action. Resolves true if approved. */
   confirmDestructive(message: string): Promise<boolean>;
+
+  // Optional richer browser adapters for future native wiring.
+  getSelection?(tabId: string): Promise<{ text: string }>;
+  listLinks?(tabId: string): Promise<{ text: string; href: string }[]>;
+  queryDom?(tabId: string, selector: string): Promise<{ matches: number }>;
 }
 
 export interface AgentMessage {
@@ -91,5 +106,39 @@ export interface AgentStep {
 }
 
 export type AgentStepHandler = (step: AgentStep) => void;
+
+export interface AgentInput {
+  apiKey: string;
+  model: ClaudeModelId;
+  systemPrompt: string;
+  history: { role: 'user' | 'assistant'; content: string }[];
+  userMessage: string;
+  context: ToolContext;
+  onStep: AgentStepHandler;
+}
+
+export interface PlanStep {
+  id: string;
+  toolName: ToolName;
+  input: Record<string, unknown>;
+  expected: string;
+}
+
+export interface ExecutionPlan {
+  goal: string;
+  rationale: string;
+  steps: PlanStep[];
+}
+
+export interface VerificationResult {
+  ok: boolean;
+  reason?: string;
+}
+
+export interface PolicyDecision {
+  allowed: boolean;
+  reason?: string;
+  requiresConfirmation: boolean;
+}
 
 export const MAX_TOOL_CALLS_PER_TASK = 25;

@@ -29,6 +29,12 @@ export interface Downloads {
   forPlatform: Partial<Record<Platform, ReleaseAsset>>;
   /** checksums.txt from the newest release that has one. */
   checksumsUrl: string | null;
+  /** True when the newest release is at or above the agentic AI baseline. */
+  agentReady: boolean;
+  /** Minimum tag expected for the production agentic AI foundation. */
+  agentMinTag: string;
+  /** HTML page URL for the newest published release. */
+  latestReleaseUrl: string | null;
   /** True only if the GitHub API could not be reached at all. */
   apiUnavailable: boolean;
 }
@@ -40,6 +46,7 @@ export const REPO_NAME =
   (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_REPO_NAME) ||
   'bullebrowser';
 export const RELEASES_PAGE = `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases`;
+export const AGENT_MIN_TAG = 'v0.2.0';
 
 interface RawAsset {
   name: string;
@@ -49,9 +56,25 @@ interface RawAsset {
 interface RawRelease {
   tag_name: string;
   published_at: string;
+  html_url: string;
   draft: boolean;
   prerelease: boolean;
   assets: RawAsset[];
+}
+
+function semverParts(tag: string): [number, number, number] | null {
+  const match = tag.trim().match(/^v?(\d+)\.(\d+)\.(\d+)/i);
+  if (!match) return null;
+  return [Number(match[1]), Number(match[2]), Number(match[3])];
+}
+
+function semverGte(tag: string, minimum: string): boolean {
+  const t = semverParts(tag);
+  const m = semverParts(minimum);
+  if (!t || !m) return false;
+  if (t[0] !== m[0]) return t[0] > m[0];
+  if (t[1] !== m[1]) return t[1] > m[1];
+  return t[2] >= m[2];
 }
 
 function classify(name: string): Platform | null {
@@ -71,6 +94,9 @@ export async function fetchDownloads(): Promise<Downloads> {
     publishedAt: null,
     forPlatform: {},
     checksumsUrl: null,
+    agentReady: false,
+    agentMinTag: AGENT_MIN_TAG,
+    latestReleaseUrl: null,
     apiUnavailable: false,
   };
   let releases: RawRelease[];
@@ -118,11 +144,15 @@ export async function fetchDownloads(): Promise<Downloads> {
   }
 
   const latest = published[0] ?? null;
+  const latestTag = latest?.tag_name ?? null;
   return {
-    latestTag: latest?.tag_name ?? null,
+    latestTag,
     publishedAt: latest?.published_at ?? null,
     forPlatform,
     checksumsUrl,
+    agentReady: latestTag ? semverGte(latestTag, AGENT_MIN_TAG) : false,
+    agentMinTag: AGENT_MIN_TAG,
+    latestReleaseUrl: latest?.html_url ?? null,
     apiUnavailable: false,
   };
 }

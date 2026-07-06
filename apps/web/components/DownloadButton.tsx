@@ -79,6 +79,16 @@ export function DownloadButton({ size = 'lg' }: { size?: 'lg' | 'md' }) {
         </a>
         <div className="text-xs text-ink-secondary">
           {primary.tag} · {formatBytes(primary.size)}
+          {dl && (
+            <>
+              {' · '}
+              <span className={dl.agentReady ? 'text-emerald-700' : 'text-amber-700'}>
+                {dl.agentReady
+                  ? 'Agentic AI ready'
+                  : `Agentic AI baseline ${dl.agentMinTag}+`}
+              </span>
+            </>
+          )}
           {macAlt && (
             <>
               {' · '}
@@ -112,6 +122,7 @@ export function DownloadButton({ size = 'lg' }: { size?: 'lg' | 'md' }) {
           : loaded && !dl?.latestTag
             ? 'Preparing the first public release — '
             : ''}
+        {loaded && dl?.latestTag && !dl.agentReady ? `Latest is ${dl.latestTag}; ` : ''}
         <a href={RELEASES_PAGE} className="underline" target="_blank" rel="noopener noreferrer">
           all releases on GitHub
         </a>

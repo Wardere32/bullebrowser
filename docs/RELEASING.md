@@ -17,7 +17,7 @@ Configure the following under **Settings → Secrets and variables → Actions**
 | `APPLE_TEAM_ID` | `build-desktop.yml` | 10-character Apple Developer Team ID |
 | `WINDOWS_CERTIFICATE` | `build-desktop.yml` | Base64 of the `.pfx` Authenticode signing certificate |
 
-> Important: macOS releases must be signed and notarized with a valid Apple Developer certificate and Apple ID to avoid Gatekeeper warnings. The build workflow now fails if any of the macOS signing/notarization secrets are missing, so unsigned DMGs will not be published.
+> Important: macOS releases should be signed and notarized with a valid Apple Developer certificate and Apple ID to avoid Gatekeeper warnings. When signing/notarization secrets are missing, the workflow now falls back to an ad-hoc-signed, un-notarized build (and emits a warning) so the pipeline still produces artifacts.
 | `WINDOWS_CERTIFICATE_PASSWORD` | `build-desktop.yml` | Password for the `.pfx` |
 
 The landing page deploys to **GitHub Pages** — no third-party host and
@@ -81,6 +81,30 @@ The push to a `v*.*.*` tag triggers `build-desktop.yml`, which:
 5. Publishes a GitHub Release with all installers and `checksums.txt`
    attached, plus auto-generated notes from Conventional Commits since
    the previous tag.
+
+### Publish now (no local tag tooling)
+
+If you need downloads live immediately and do not want to create/push a
+tag locally, run `build-desktop` manually:
+
+1. Go to **Actions → build-desktop → Run workflow**.
+2. Set `version` to a semver like `0.2.0`.
+3. Leave `publish_release` as `true`.
+
+The workflow stamps package versions for the build, produces signed
+installers per platform, and publishes a GitHub Release at
+`v<version>` from the selected commit.
+
+## CI safeguards (added after v0.2.0 incident)
+
+To prevent CI regressions that can invalidate entire release runs:
+
+1. The `ci.yml` quality job rejects any step-level workflow condition that
+   references `secrets.*` directly in `if:`.
+2. `build-desktop.yml` probes macOS secret availability into step outputs
+   and gates signing/notarization steps on those outputs.
+3. Desktop smoke launch helper is idempotent to AI panel default state
+   (open or closed), so default-setting changes do not break e2e startup.
 
 ## 3. Verify the release
 

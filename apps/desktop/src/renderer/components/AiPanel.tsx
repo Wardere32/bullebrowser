@@ -7,6 +7,7 @@ import { useAgentStore } from '../state/agent-store.js';
 import { useBrowserStore } from '../state/browser-store.js';
 import { AGENT_PROMPT_EVENT } from '../lib/url.js';
 import { expandSlashCommand, SLASH_COMMANDS } from '../lib/slash-commands.js';
+import { useInputActivity } from '../hooks/useInputActivity.js';
 import type { AppSettings } from '../../shared/ipc.js';
 import type { AgentStepEvent } from '../../shared/agent-events.js';
 
@@ -34,6 +35,8 @@ export function AiPanel() {
   const [model, setModel] = useState<ClaudeModelId>('claude-opus-4-7');
   const [hasKey, setHasKey] = useState(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const promptDisabled = !hasKey || status === 'running';
+  const promptActivity = useInputActivity({ disabled: promptDisabled });
 
   useEffect(() => {
     void (async () => {
@@ -104,6 +107,7 @@ export function AiPanel() {
     if (!draft.trim()) return;
     const t = draft.trim();
     setDraft('');
+    promptActivity.reset();
     await sendMessage(t);
   };
 
@@ -247,20 +251,35 @@ export function AiPanel() {
           </div>
         )}
         <div className="flex items-end gap-2">
-          <textarea
-            ref={textareaRef}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={onKeyDown}
-            disabled={!hasKey || status === 'running'}
-            placeholder={
-              hasKey
-                ? 'Ask the agent anything. Try /summarize, /compare-tabs, /find — or just describe a task.'
-                : 'Add an API key in Settings to start chatting.'
-            }
-            rows={3}
-            className="flex-1 resize-none rounded border border-line bg-white p-2 text-sm text-ink-primary outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted"
-          />
+          <div className="flex-1">
+            <div
+              className={`prompt-input-shell prompt-input-shell--${promptActivity.state} ${
+                promptDisabled ? 'prompt-input-shell--disabled' : ''
+              }`}
+              data-activity-state={promptActivity.state}
+            >
+              <textarea
+                ref={textareaRef}
+                value={draft}
+                onChange={(e) => {
+                  setDraft(e.target.value);
+                  promptActivity.onInputActivity();
+                }}
+                onPaste={() => promptActivity.onInputActivity()}
+                onFocus={promptActivity.onFocus}
+                onBlur={promptActivity.onBlur}
+                onKeyDown={onKeyDown}
+                disabled={promptDisabled}
+                placeholder={
+                  hasKey
+                    ? 'Ask the agent anything. Try /summarize, /compare-tabs, /find — or just describe a task.'
+                    : 'Add an API key in Settings to start chatting.'
+                }
+                rows={3}
+                className="prompt-input-field"
+              />
+            </div>
+          </div>
           {status === 'running' ? (
             <button
               type="button"

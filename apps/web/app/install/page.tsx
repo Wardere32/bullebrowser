@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 import { product } from '@bullebrowser/brand-tokens';
 import { DownloadButton } from '@/components/DownloadButton';
+import { asset } from '@/lib/asset';
 
 export const metadata: Metadata = {
   title: 'Install & setup',
@@ -27,6 +29,10 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
 export default function InstallPage() {
   return (
     <div className="mx-auto max-w-3xl px-6 py-16">
+      <div className="mb-6 inline-flex items-center gap-3 rounded-full border border-line bg-surface-muted px-4 py-2">
+        <Image src={asset('/wordmark.png')} alt={product.name} width={160} height={28} />
+        <span className="text-xs text-ink-secondary">Brand-authenticated installer path</span>
+      </div>
       <h1 className="text-4xl font-bold">Install {product.name}</h1>
       <p className="mt-2 text-ink-secondary">
         From download to a working AI agent in a few minutes. No technical

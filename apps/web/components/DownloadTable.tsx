@@ -58,6 +58,31 @@ export function DownloadTable() {
         )}
       </p>
 
+      {loaded && dl && (
+        <div
+          className={`mt-3 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${
+            dl.agentReady
+              ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+              : 'border-amber-300 bg-amber-50 text-amber-800'
+          }`}
+        >
+          <span className={`h-2 w-2 rounded-full ${dl.agentReady ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+          {dl.agentReady
+            ? `Agentic AI build ready (${dl.latestTag ?? 'latest'})`
+            : `Agentic AI baseline requires ${dl.agentMinTag} or newer`}
+          {dl.latestReleaseUrl && (
+            <a
+              href={dl.latestReleaseUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+            >
+              release notes
+            </a>
+          )}
+        </div>
+      )}
+
       <div className="mt-8 overflow-hidden rounded-lg border border-line">
         <table className="w-full text-sm">
           <thead className="bg-surface-muted text-left text-xs uppercase tracking-wide text-ink-secondary">

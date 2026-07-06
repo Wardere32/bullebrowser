@@ -1,265 +1,340 @@
-// Tool registry. Each tool exports a Zod schema pair plus an execute()
-// function that takes a ToolContext. The Anthropic tool-use definitions
-// are derived from the input schemas at startup time via toAnthropicTools.
-
 import { z } from 'zod';
 import type { ToolContext, ToolDefinition, ToolName } from '../types.js';
 
-const NavigateInput = z.object({
-  url: z.string().url().describe('Absolute http(s) URL to navigate to'),
-});
+const EmptyObject = z.object({}).strict();
+const NavigateInput = z.object({ url: z.string().url() });
 const NavigateOutput = z.object({ url: z.string(), title: z.string() });
-
-const ReadPageInput = z.object({
-  tabId: z
-    .string()
-    .optional()
-    .describe(
-      'Optional tab id from list_tabs. When omitted, reads the active tab. ' +
-        'Use this to silently read background tabs without switching focus.',
-    ),
-});
-const ReadPageOutput = z.object({
-  title: z.string(),
-  url: z.string(),
-  text: z.string(),
-});
-
-const ClickInput = z.object({
-  target: z
-    .string()
-    .min(1)
-    .describe('A CSS selector or visible text of the element to click'),
-});
-const ClickOutput = z.object({ matched: z.string() });
-
-const TypeInput = z.object({
-  target: z
-    .string()
-    .min(1)
-    .describe('A CSS selector or label text identifying the input field'),
-  text: z.string().describe('The text to type into the field'),
-});
-const TypeOutput = z.object({ matched: z.string() });
-
-const ExtractInput = z.object({
-  schema: z
-    .record(z.unknown())
-    .describe('JSON schema describing the structured shape to extract'),
-});
-const ExtractOutput = z.object({ data: z.unknown() });
-
-const ScreenshotInput = z.object({}).strict();
-const ScreenshotOutput = z.object({
-  pngBase64: z.string().describe('Base64-encoded PNG of the current viewport'),
-});
-
-const NewTabInput = z.object({
-  url: z.string().url().optional().describe('Optional URL to open in the new tab'),
-});
-const NewTabOutput = z.object({
+const TabIdInput = z.object({ tabId: z.string().optional() });
+const SelectorInput = z.object({ selector: z.string().min(1) });
+const ClickInput = z.object({ target: z.string().min(1) });
+const TypeInput = z.object({ target: z.string().min(1), text: z.string() });
+const ExtractInput = z.object({ schema: z.record(z.unknown()) });
+const LinkShape = z.object({ text: z.string(), href: z.string() });
+const TabShape = z.object({
   id: z.string(),
   title: z.string(),
   url: z.string(),
   active: z.boolean(),
 });
 
-const SwitchTabInput = z.object({ tabId: z.string() });
-const SwitchTabOutput = NewTabOutput;
+const PageTextOut = z.object({ tabId: z.string(), title: z.string(), url: z.string(), text: z.string() });
+const MetaOut = z.object({ tabId: z.string(), title: z.string(), url: z.string() });
+const SummaryOut = z.object({ summary: z.string(), citations: z.array(z.string()) });
+const ExtractOut = z.object({ data: z.unknown() });
+const SelectionOut = z.object({ text: z.string() });
+const LinksOut = z.object({ links: z.array(LinkShape) });
+const QueryDomOut = z.object({ matches: z.number() });
+const ClickOut = z.object({ matched: z.string() });
+const TypeOut = z.object({ matched: z.string() });
 
-const ListTabsInput = z.object({}).strict();
-const ListTabsOutput = z.object({ tabs: z.array(NewTabOutput) });
-
-const WaitForInput = z
-  .object({
-    selector: z.string().optional(),
-    networkIdle: z.boolean().optional(),
-    timeoutMs: z.number().int().positive().max(10_000).optional(),
-  })
-  .refine((v) => v.selector || v.networkIdle, {
-    message: 'Provide either selector or networkIdle: true',
-  });
-const WaitForOutput = z.object({ matched: z.boolean() });
-
-const CloseTabInput = z.object({
-  tabId: z.string().describe('Id of the tab to close (from list_tabs).'),
+const SummarizeInput = z.object({
+  text: z.string().min(1),
+  maxSentences: z.number().int().positive().max(12).optional(),
+  sourceUrl: z.string().optional(),
 });
-const CloseTabOutput = z.object({ closed: z.boolean() });
 
-const GoBackInput = z.object({}).strict();
-const GoBackOutput = z.object({ url: z.string() });
-
-const GoForwardInput = z.object({}).strict();
-const GoForwardOutput = z.object({ url: z.string() });
-
-const ReloadInput = z.object({}).strict();
-const ReloadOutput = z.object({ url: z.string() });
-
-const ScrollInput = z.object({
-  direction: z
-    .enum(['up', 'down', 'top', 'bottom'])
-    .describe('Scroll direction: up/down by amount, or jump to top/bottom of page.'),
-  amount: z
-    .number()
-    .int()
-    .positive()
-    .optional()
-    .describe('Pixels to scroll for up/down (default 600). Ignored for top/bottom.'),
+const QueryDomInput = z.object({
+  selector: z.string().min(1),
+  tabId: z.string().optional(),
 });
-const ScrollOutput = z.object({ scrolledTo: z.number() });
-
-const PressKeyInput = z.object({
-  key: z
-    .enum(['Enter', 'Tab', 'Escape', 'ArrowDown', 'ArrowUp', 'PageDown', 'PageUp'])
-    .describe(
-      'Key to dispatch to the focused element. Use Enter to submit a form ' +
-        'after typing into a field; Tab to advance to the next field.',
-    ),
-});
-const PressKeyOutput = z.object({ pressed: z.string() });
 
 export interface ToolImpl<I, O> extends ToolDefinition<I, O> {
   execute: (input: I, ctx: ToolContext) => Promise<O>;
 }
 
 export const tools = {
+  getActiveTab: {
+    name: 'getActiveTab',
+    description: 'Return the active tab metadata.',
+    inputSchema: EmptyObject,
+    outputSchema: TabShape,
+    execute: async (_input, ctx) => {
+      const tabs = await ctx.runtime.listTabs();
+      const active = tabs.find((t) => t.active) ?? tabs.find((t) => t.id === ctx.activeTabId);
+      if (!active) throw new Error('No active tab found.');
+      return active;
+    },
+  } satisfies ToolImpl<z.infer<typeof EmptyObject>, z.infer<typeof TabShape>>,
+
+  listTabs: {
+    name: 'listTabs',
+    description: 'List all open tabs.',
+    inputSchema: EmptyObject,
+    outputSchema: z.object({ tabs: z.array(TabShape) }),
+    execute: async (_input, ctx) => ({ tabs: await ctx.runtime.listTabs() }),
+  } satisfies ToolImpl<z.infer<typeof EmptyObject>, { tabs: z.infer<typeof TabShape>[] }>,
+
+  getPageText: {
+    name: 'getPageText',
+    description: 'Get readable text from a page.',
+    inputSchema: TabIdInput,
+    outputSchema: PageTextOut,
+    execute: async (input, ctx) => {
+      const tabId = input.tabId ?? ctx.activeTabId;
+      const page = await ctx.runtime.readPage(tabId);
+      return { tabId, title: page.title, url: page.url, text: page.text };
+    },
+  } satisfies ToolImpl<z.infer<typeof TabIdInput>, z.infer<typeof PageTextOut>>,
+
+  getPageMetadata: {
+    name: 'getPageMetadata',
+    description: 'Get URL and title for a page.',
+    inputSchema: TabIdInput,
+    outputSchema: MetaOut,
+    execute: async (input, ctx) => {
+      const tabId = input.tabId ?? ctx.activeTabId;
+      const page = await ctx.runtime.readPage(tabId);
+      return { tabId, title: page.title, url: page.url };
+    },
+  } satisfies ToolImpl<z.infer<typeof TabIdInput>, z.infer<typeof MetaOut>>,
+
+  getSelection: {
+    name: 'getSelection',
+    description: 'Get selected text from the active page when available.',
+    inputSchema: TabIdInput,
+    outputSchema: SelectionOut,
+    execute: async (input, ctx) => {
+      const tabId = input.tabId ?? ctx.activeTabId;
+      if (!ctx.runtime.getSelection) return { text: '' };
+      return ctx.runtime.getSelection(tabId);
+    },
+  } satisfies ToolImpl<z.infer<typeof TabIdInput>, z.infer<typeof SelectionOut>>,
+
+  listLinks: {
+    name: 'listLinks',
+    description: 'List visible page links when available.',
+    inputSchema: TabIdInput,
+    outputSchema: LinksOut,
+    execute: async (input, ctx) => {
+      const tabId = input.tabId ?? ctx.activeTabId;
+      if (ctx.runtime.listLinks) return { links: await ctx.runtime.listLinks(tabId) };
+      const page = await ctx.runtime.readPage(tabId);
+      const links = (page.text.match(/https?:\/\/\S+/g) ?? []).slice(0, 100).map((href) => ({
+        text: href,
+        href,
+      }));
+      return { links };
+    },
+  } satisfies ToolImpl<z.infer<typeof TabIdInput>, z.infer<typeof LinksOut>>,
+
+  queryDom: {
+    name: 'queryDom',
+    description: 'Count DOM matches for a selector when native hook exists.',
+    inputSchema: QueryDomInput,
+    outputSchema: QueryDomOut,
+    execute: async (input, ctx) => {
+      const tabId = input.tabId ?? ctx.activeTabId;
+      if (!ctx.runtime.queryDom) {
+        throw new Error('queryDom is not available in this runtime adapter yet.');
+      }
+      return ctx.runtime.queryDom(tabId, input.selector);
+    },
+  } satisfies ToolImpl<z.infer<typeof QueryDomInput>, z.infer<typeof QueryDomOut>>,
+
+  summarizePage: {
+    name: 'summarizePage',
+    description: 'Create a concise local summary from page text.',
+    inputSchema: SummarizeInput,
+    outputSchema: SummaryOut,
+    execute: async (input) => {
+      const maxSentences = input.maxSentences ?? 4;
+      const compact = input.text.replace(/\s+/g, ' ').trim();
+      const sentences = compact
+        .split(/(?<=[.!?])\s+/)
+        .filter((s) => s.length > 20)
+        .slice(0, maxSentences);
+      const summary = sentences.join(' ').slice(0, 2000);
+      const citations = input.sourceUrl ? [input.sourceUrl] : [];
+      return { summary, citations };
+    },
+  } satisfies ToolImpl<z.infer<typeof SummarizeInput>, z.infer<typeof SummaryOut>>,
+
+  extractStructuredData: {
+    name: 'extractStructuredData',
+    description: 'Extract structured data from the page based on a schema.',
+    inputSchema: z.object({ schema: z.record(z.unknown()), tabId: z.string().optional() }),
+    outputSchema: ExtractOut,
+    execute: async (input, ctx) => {
+      const tabId = input.tabId ?? ctx.activeTabId;
+      return ctx.runtime.extract(tabId, input.schema);
+    },
+  } satisfies ToolImpl<
+    { schema: Record<string, unknown>; tabId?: string },
+    z.infer<typeof ExtractOut>
+  >,
+
   navigate: {
     name: 'navigate',
-    description: 'Navigate the active tab to an absolute URL.',
+    description: 'Navigate the active tab to a URL.',
     inputSchema: NavigateInput,
     outputSchema: NavigateOutput,
     execute: (input, ctx) => ctx.runtime.navigate(ctx.activeTabId, input.url),
   } satisfies ToolImpl<z.infer<typeof NavigateInput>, z.infer<typeof NavigateOutput>>,
 
+  clickElement: {
+    name: 'clickElement',
+    description: 'Click an element identified by a selector or visible text.',
+    inputSchema: ClickInput,
+    outputSchema: ClickOut,
+    destructive: true,
+    execute: (input, ctx) => ctx.runtime.click(ctx.activeTabId, input.target),
+  } satisfies ToolImpl<z.infer<typeof ClickInput>, z.infer<typeof ClickOut>>,
+
+  typeIntoField: {
+    name: 'typeIntoField',
+    description: 'Type text into a field identified by selector or label.',
+    inputSchema: TypeInput,
+    outputSchema: TypeOut,
+    destructive: true,
+    execute: (input, ctx) => ctx.runtime.type(ctx.activeTabId, input.target, input.text),
+  } satisfies ToolImpl<z.infer<typeof TypeInput>, z.infer<typeof TypeOut>>,
+
+
+  // Legacy aliases to preserve compatibility with existing prompts and UX copy.
   read_page: {
     name: 'read_page',
-    description:
-      'Return the cleaned, readable text content of a page (no navigation, no scripts). ' +
-      'Defaults to the active tab; pass tabId to read a background tab silently.',
-    inputSchema: ReadPageInput,
-    outputSchema: ReadPageOutput,
-    execute: (input, ctx) => ctx.runtime.readPage(input.tabId ?? ctx.activeTabId),
-  } satisfies ToolImpl<z.infer<typeof ReadPageInput>, z.infer<typeof ReadPageOutput>>,
+    description: 'Legacy alias for getPageText.',
+    inputSchema: TabIdInput,
+    outputSchema: z.object({ title: z.string(), url: z.string(), text: z.string() }),
+    execute: async (input, ctx) => {
+      const tabId = input.tabId ?? ctx.activeTabId;
+      return ctx.runtime.readPage(tabId);
+    },
+  } satisfies ToolImpl<z.infer<typeof TabIdInput>, { title: string; url: string; text: string }>,
 
   click: {
     name: 'click',
-    description: 'Click an element identified by a CSS selector or visible text.',
+    description: 'Legacy alias for clickElement.',
     inputSchema: ClickInput,
-    outputSchema: ClickOutput,
+    outputSchema: ClickOut,
     destructive: true,
     execute: (input, ctx) => ctx.runtime.click(ctx.activeTabId, input.target),
-  } satisfies ToolImpl<z.infer<typeof ClickInput>, z.infer<typeof ClickOutput>>,
+  } satisfies ToolImpl<z.infer<typeof ClickInput>, z.infer<typeof ClickOut>>,
 
   type: {
     name: 'type',
-    description: 'Type text into a form input identified by selector or label.',
+    description: 'Legacy alias for typeIntoField.',
     inputSchema: TypeInput,
-    outputSchema: TypeOutput,
+    outputSchema: TypeOut,
+    destructive: true,
     execute: (input, ctx) => ctx.runtime.type(ctx.activeTabId, input.target, input.text),
-  } satisfies ToolImpl<z.infer<typeof TypeInput>, z.infer<typeof TypeOutput>>,
+  } satisfies ToolImpl<z.infer<typeof TypeInput>, z.infer<typeof TypeOut>>,
 
   extract: {
     name: 'extract',
-    description:
-      'Extract structured data from the current page matching the provided JSON schema.',
+    description: 'Legacy alias for extractStructuredData.',
     inputSchema: ExtractInput,
-    outputSchema: ExtractOutput,
+    outputSchema: ExtractOut,
     execute: (input, ctx) => ctx.runtime.extract(ctx.activeTabId, input.schema),
-  } satisfies ToolImpl<z.infer<typeof ExtractInput>, z.infer<typeof ExtractOutput>>,
+  } satisfies ToolImpl<z.infer<typeof ExtractInput>, z.infer<typeof ExtractOut>>,
 
   screenshot: {
     name: 'screenshot',
-    description: 'Capture the current viewport as a base64-encoded PNG.',
-    inputSchema: ScreenshotInput,
-    outputSchema: ScreenshotOutput,
+    description: 'Capture the current viewport as PNG.',
+    inputSchema: EmptyObject,
+    outputSchema: z.object({ pngBase64: z.string() }),
     execute: (_input, ctx) => ctx.runtime.screenshot(ctx.activeTabId),
-  } satisfies ToolImpl<z.infer<typeof ScreenshotInput>, z.infer<typeof ScreenshotOutput>>,
+  } satisfies ToolImpl<z.infer<typeof EmptyObject>, { pngBase64: string }>,
 
   new_tab: {
     name: 'new_tab',
-    description: 'Open a new browser tab, optionally navigating to a URL.',
-    inputSchema: NewTabInput,
-    outputSchema: NewTabOutput,
+    description: 'Open a new tab.',
+    inputSchema: z.object({ url: z.string().url().optional() }),
+    outputSchema: TabShape,
     execute: (input, ctx) => ctx.runtime.newTab(input.url),
-  } satisfies ToolImpl<z.infer<typeof NewTabInput>, z.infer<typeof NewTabOutput>>,
+  } satisfies ToolImpl<{ url?: string }, z.infer<typeof TabShape>>,
 
   switch_tab: {
     name: 'switch_tab',
-    description: 'Switch to a previously opened tab by id.',
-    inputSchema: SwitchTabInput,
-    outputSchema: SwitchTabOutput,
+    description: 'Switch active tab.',
+    inputSchema: z.object({ tabId: z.string() }),
+    outputSchema: TabShape,
     execute: (input, ctx) => ctx.runtime.switchTab(input.tabId),
-  } satisfies ToolImpl<z.infer<typeof SwitchTabInput>, z.infer<typeof SwitchTabOutput>>,
+  } satisfies ToolImpl<{ tabId: string }, z.infer<typeof TabShape>>,
 
   list_tabs: {
     name: 'list_tabs',
-    description: 'Return all open tabs with id, title, and URL.',
-    inputSchema: ListTabsInput,
-    outputSchema: ListTabsOutput,
+    description: 'Legacy alias for listTabs.',
+    inputSchema: EmptyObject,
+    outputSchema: z.object({ tabs: z.array(TabShape) }),
     execute: async (_input, ctx) => ({ tabs: await ctx.runtime.listTabs() }),
-  } satisfies ToolImpl<z.infer<typeof ListTabsInput>, z.infer<typeof ListTabsOutput>>,
-
-  wait_for: {
-    name: 'wait_for',
-    description:
-      'Wait for a CSS selector to appear, or for network idle. Hard cap at 10 seconds.',
-    inputSchema: WaitForInput,
-    outputSchema: WaitForOutput,
-    execute: (input, ctx) => ctx.runtime.waitFor(ctx.activeTabId, input),
-  } satisfies ToolImpl<z.infer<typeof WaitForInput>, z.infer<typeof WaitForOutput>>,
+  } satisfies ToolImpl<z.infer<typeof EmptyObject>, { tabs: z.infer<typeof TabShape>[] }>,
 
   close_tab: {
     name: 'close_tab',
-    description: 'Close a tab by id. The user can reopen via history if needed.',
-    inputSchema: CloseTabInput,
-    outputSchema: CloseTabOutput,
+    description: 'Close tab by id.',
+    inputSchema: z.object({ tabId: z.string() }),
+    outputSchema: z.object({ closed: z.boolean() }),
     destructive: true,
     execute: (input, ctx) => ctx.runtime.closeTab(input.tabId),
-  } satisfies ToolImpl<z.infer<typeof CloseTabInput>, z.infer<typeof CloseTabOutput>>,
+  } satisfies ToolImpl<{ tabId: string }, { closed: boolean }>,
 
   go_back: {
     name: 'go_back',
-    description: 'Navigate the active tab back one entry in its history.',
-    inputSchema: GoBackInput,
-    outputSchema: GoBackOutput,
+    description: 'Navigate backward.',
+    inputSchema: EmptyObject,
+    outputSchema: z.object({ url: z.string() }),
     execute: (_input, ctx) => ctx.runtime.goBack(ctx.activeTabId),
-  } satisfies ToolImpl<z.infer<typeof GoBackInput>, z.infer<typeof GoBackOutput>>,
+  } satisfies ToolImpl<z.infer<typeof EmptyObject>, { url: string }>,
 
   go_forward: {
     name: 'go_forward',
-    description: 'Navigate the active tab forward one entry in its history.',
-    inputSchema: GoForwardInput,
-    outputSchema: GoForwardOutput,
+    description: 'Navigate forward.',
+    inputSchema: EmptyObject,
+    outputSchema: z.object({ url: z.string() }),
     execute: (_input, ctx) => ctx.runtime.goForward(ctx.activeTabId),
-  } satisfies ToolImpl<z.infer<typeof GoForwardInput>, z.infer<typeof GoForwardOutput>>,
+  } satisfies ToolImpl<z.infer<typeof EmptyObject>, { url: string }>,
 
   reload: {
     name: 'reload',
-    description: 'Reload the active tab.',
-    inputSchema: ReloadInput,
-    outputSchema: ReloadOutput,
+    description: 'Reload tab.',
+    inputSchema: EmptyObject,
+    outputSchema: z.object({ url: z.string() }),
     execute: (_input, ctx) => ctx.runtime.reload(ctx.activeTabId),
-  } satisfies ToolImpl<z.infer<typeof ReloadInput>, z.infer<typeof ReloadOutput>>,
+  } satisfies ToolImpl<z.infer<typeof EmptyObject>, { url: string }>,
 
   scroll: {
     name: 'scroll',
-    description:
-      'Scroll the active page up/down by an amount, or jump to top/bottom. ' +
-      'Use after read_page if more content is below the fold.',
-    inputSchema: ScrollInput,
-    outputSchema: ScrollOutput,
+    description: 'Scroll page.',
+    inputSchema: z.object({ direction: z.enum(['up', 'down', 'top', 'bottom']), amount: z.number().int().positive().optional() }),
+    outputSchema: z.object({ scrolledTo: z.number() }),
     execute: (input, ctx) => ctx.runtime.scroll(ctx.activeTabId, input),
-  } satisfies ToolImpl<z.infer<typeof ScrollInput>, z.infer<typeof ScrollOutput>>,
+  } satisfies ToolImpl<
+    { direction: 'up' | 'down' | 'top' | 'bottom'; amount?: number },
+    { scrolledTo: number }
+  >,
 
   press_key: {
     name: 'press_key',
-    description:
-      'Dispatch a key (Enter, Tab, Escape, ArrowUp/Down, PageUp/Down) to the ' +
-      'focused element. Use Enter after type to submit a search or form.',
-    inputSchema: PressKeyInput,
-    outputSchema: PressKeyOutput,
+    description: 'Dispatch keyboard event to focused element.',
+    inputSchema: z.object({
+      key: z.enum(['Enter', 'Tab', 'Escape', 'ArrowDown', 'ArrowUp', 'PageDown', 'PageUp']),
+    }),
+    outputSchema: z.object({ pressed: z.string() }),
     execute: (input, ctx) => ctx.runtime.pressKey(ctx.activeTabId, input.key),
-  } satisfies ToolImpl<z.infer<typeof PressKeyInput>, z.infer<typeof PressKeyOutput>>,
+  } satisfies ToolImpl<
+    { key: 'Enter' | 'Tab' | 'Escape' | 'ArrowDown' | 'ArrowUp' | 'PageDown' | 'PageUp' },
+    { pressed: string }
+  >,
+
+  wait_for: {
+    name: 'wait_for',
+    description: 'Wait for selector or network idle.',
+    inputSchema: z
+      .object({
+        selector: z.string().optional(),
+        networkIdle: z.boolean().optional(),
+        timeoutMs: z.number().int().positive().max(10_000).optional(),
+      })
+      .refine((v) => v.selector || v.networkIdle, {
+        message: 'Provide either selector or networkIdle: true',
+      }),
+    outputSchema: z.object({ matched: z.boolean() }),
+    execute: (input, ctx) => ctx.runtime.waitFor(ctx.activeTabId, input),
+  } satisfies ToolImpl<
+    { selector?: string; networkIdle?: boolean; timeoutMs?: number },
+    { matched: boolean }
+  >,
 } as const;
 
 export type ToolRegistry = typeof tools;
@@ -268,11 +343,6 @@ export function getTool(name: string): ToolImpl<unknown, unknown> | undefined {
   return (tools as Record<string, ToolImpl<unknown, unknown>>)[name];
 }
 
-/**
- * Convert a Zod object schema to a JSON schema fragment shaped for the
- * Anthropic tool-use API. We only need the "type/properties/required"
- * envelope, so we walk the schema rather than pulling in a full converter.
- */
 export function zodToJsonSchema(schema: z.ZodType<unknown>): Record<string, unknown> {
   if (schema instanceof z.ZodObject) {
     const properties: Record<string, unknown> = {};
