@@ -68,8 +68,8 @@ export function DownloadTable() {
         >
           <span className={`h-2 w-2 rounded-full ${dl.agentReady ? 'bg-emerald-500' : 'bg-amber-500'}`} />
           {dl.agentReady
-            ? `Agentic AI build ready (${dl.latestTag ?? 'latest'})`
-            : `Agentic AI baseline requires ${dl.agentMinTag} or newer`}
+            ? `Agentic browser build ready (${dl.latestTag ?? 'latest'})`
+            : `Agentic browser baseline requires ${dl.agentMinTag} or newer`}
           {dl.latestReleaseUrl && (
             <a
               href={dl.latestReleaseUrl}

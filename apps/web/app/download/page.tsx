@@ -19,7 +19,7 @@ export default function DownloadPage() {
       <h1 className="text-3xl font-bold">Download {product.name}</h1>
       <p className="mt-2 text-ink-secondary">
         Every installer here is tied to the current BulleBrowser release channel and includes the
-        in-browser Agentic AI experience.
+        in-browser agentic browser experience.
       </p>
       <DownloadTable />
       <p className="mt-6 text-xs text-ink-secondary">
