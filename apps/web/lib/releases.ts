@@ -122,8 +122,10 @@ export async function fetchDownloads(): Promise<Downloads> {
         new Date(b.published_at).getTime() - new Date(a.published_at).getTime(),
     );
 
+  const latest = published[0] ?? null;
   const forPlatform: Downloads['forPlatform'] = {};
-  let checksumsUrl: string | null = null;
+  const checksumsUrl =
+    latest?.assets.find((asset) => /checksum/i.test(asset.name))?.browser_download_url ?? null;
 
   for (const rel of published) {
     for (const a of rel.assets) {
@@ -137,13 +139,8 @@ export async function fetchDownloads(): Promise<Downloads> {
           tag: rel.tag_name,
         };
       }
-      if (!checksumsUrl && /checksum/i.test(a.name)) {
-        checksumsUrl = a.browser_download_url;
-      }
     }
   }
-
-  const latest = published[0] ?? null;
   const latestTag = latest?.tag_name ?? null;
   return {
     latestTag,
