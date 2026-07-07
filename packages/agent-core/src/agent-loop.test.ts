@@ -139,6 +139,39 @@ describe('runAgent Claude tool-use loop', () => {
     expect(out).toContain('did not submit');
   });
 
+  it('continues and accumulates a reply that was cut off at the token limit', async () => {
+    createMock
+      .mockResolvedValueOnce({
+        stop_reason: 'max_tokens',
+        content: [textBlock('The capital of France is')],
+      })
+      .mockResolvedValueOnce({
+        stop_reason: 'end_turn',
+        content: [textBlock('Paris.')],
+      });
+
+    const out = await runAgent({
+      apiKey: 'test-key',
+      model: DEFAULT_MODEL,
+      systemPrompt: 'You are the BulleBrowser agent.',
+      history: [],
+      userMessage: 'what is the capital of France?',
+      context: makeContext(),
+      onStep: () => {},
+    });
+
+    expect(out).toBe('The capital of France is Paris.');
+    expect(createMock).toHaveBeenCalledTimes(2);
+    // The second request must carry a "continue" nudge as a user turn.
+    const secondCall = createMock.mock.calls[1]?.[0] as {
+      messages: Array<{ role: string; content: unknown }>;
+    };
+    const continued = secondCall.messages.some(
+      (m) => m.role === 'user' && typeof m.content === 'string' && /cut off/i.test(m.content),
+    );
+    expect(continued).toBe(true);
+  });
+
   it('surfaces a real error (does not fake an answer) when no API key is set', async () => {
     await expect(
       runAgent({

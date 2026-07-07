@@ -232,15 +232,33 @@ export async function runAgent(input: AgentInput): Promise<string> {
       messages,
     });
 
-    const textParts = response.content
+    const turnText = response.content
       .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-      .map((b) => b.text);
-    if (textParts.length > 0) {
-      finalText = textParts.join('\n\n').trim();
-      onStep({ type: 'text', detail: finalText });
+      .map((b) => b.text)
+      .join('\n\n')
+      .trim();
+    if (turnText) onStep({ type: 'text', detail: turnText });
+
+    // The model hit the per-turn token cap mid-answer. Preserve what it wrote,
+    // ask it to continue, and accumulate — otherwise the reply is silently
+    // truncated. (Bounded by the outer turn limit.)
+    if (response.stop_reason === 'max_tokens') {
+      finalText = finalText ? `${finalText} ${turnText}`.trim() : turnText;
+      messages.push({ role: 'assistant', content: response.content });
+      messages.push({
+        role: 'user',
+        content:
+          'Your previous message was cut off at the length limit. Continue from exactly ' +
+          'where you stopped — do not repeat text you already wrote.',
+      });
+      continue;
     }
 
-    if (response.stop_reason !== 'tool_use') break;
+    if (response.stop_reason !== 'tool_use') {
+      // Terminal turn (end_turn / stop_sequence): this is the final answer.
+      finalText = finalText ? `${finalText} ${turnText}`.trim() : turnText;
+      break;
+    }
 
     // Preserve the full assistant turn (text + tool_use blocks) so the next
     // request carries the model's own reasoning and tool calls.
