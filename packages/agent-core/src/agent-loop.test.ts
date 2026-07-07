@@ -1,6 +1,17 @@
-import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_MODEL, runAgent } from './agent-loop.js';
-import type { ToolContext } from './types.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { AgentStep, ToolContext } from './types.js';
+
+// Mock the Anthropic SDK so the loop can be driven with scripted responses.
+const { createMock } = vi.hoisted(() => ({ createMock: vi.fn() }));
+vi.mock('@anthropic-ai/sdk', () => ({
+  default: class {
+    messages = { create: createMock };
+    constructor(_opts: unknown) {}
+  },
+}));
+
+// Imported after the mock is registered.
+const { DEFAULT_MODEL, runAgent } = await import('./agent-loop.js');
 
 function makeRuntime(overrides?: Partial<ToolContext['runtime']>): ToolContext['runtime'] {
   return {
@@ -37,40 +48,108 @@ function makeContext(overrides?: Partial<ToolContext['runtime']>): ToolContext {
   };
 }
 
-describe('runAgent modular loop', () => {
-  it('runs perceive->plan->act->verify->report and returns report text', async () => {
-    const steps: string[] = [];
+function textBlock(text: string) {
+  return { type: 'text', text };
+}
+function toolUseBlock(id: string, name: string, input: Record<string, unknown>) {
+  return { type: 'tool_use', id, name, input };
+}
+
+describe('runAgent Claude tool-use loop', () => {
+  beforeEach(() => createMock.mockReset());
+
+  it('drives tools then returns the model\'s grounded final answer', async () => {
+    createMock
+      .mockResolvedValueOnce({
+        stop_reason: 'tool_use',
+        content: [textBlock('Let me read the page.'), toolUseBlock('tu1', 'read_page', {})],
+      })
+      .mockResolvedValueOnce({
+        stop_reason: 'end_turn',
+        content: [textBlock('This page explains grants and deadlines.')],
+      });
+
+    const steps: AgentStep[] = [];
     const out = await runAgent({
       apiKey: 'test-key',
       model: DEFAULT_MODEL,
-      systemPrompt: 'ignored in local planner',
+      systemPrompt: 'You are the BulleBrowser agent.',
       history: [],
       userMessage: 'summarize this page',
       context: makeContext(),
-      onStep: (s) => steps.push(s.type),
+      onStep: (s) => steps.push(s),
     });
 
-    expect(out).toContain('Execution Report');
-    expect(out).toContain('Plan goal');
-    expect(steps).toContain('tool_call');
-    expect(steps).toContain('tool_result');
-    expect(steps.at(-1)).toBe('done');
+    expect(out).toContain('grants and deadlines');
+    const kinds = steps.map((s) => s.type);
+    expect(kinds).toContain('tool_call');
+    expect(kinds).toContain('tool_result');
+    expect(kinds.at(-1)).toBe('done');
+
+    // The critical shape guarantee: tool_result.content must be a string, not a
+    // raw object (the Anthropic API rejects arbitrary objects).
+    const secondCall = createMock.mock.calls[1]?.[0] as {
+      messages: Array<{ role: string; content: unknown }>;
+    };
+    const toolResultTurn = secondCall.messages.find(
+      (m) => m.role === 'user' && Array.isArray(m.content),
+    );
+    const block = (toolResultTurn?.content as Array<{ type: string; content: unknown }>)?.[0];
+    expect(block?.type).toBe('tool_result');
+    expect(typeof block?.content).toBe('string');
+    expect(block?.content as string).toContain('grants and deadlines');
   });
 
-  it('stops when confirmation is declined for risky actions', async () => {
+  it('blocks destructive actions when the user declines confirmation', async () => {
+    createMock
+      .mockResolvedValueOnce({
+        stop_reason: 'tool_use',
+        content: [toolUseBlock('tu1', 'click', { target: 'submit' })],
+      })
+      .mockResolvedValueOnce({
+        stop_reason: 'end_turn',
+        content: [textBlock('Understood, I did not submit anything.')],
+      });
+
+    const steps: AgentStep[] = [];
+    const confirmDestructive = vi.fn(async () => false);
     const out = await runAgent({
       apiKey: 'test-key',
       model: DEFAULT_MODEL,
-      systemPrompt: 'ignored',
+      systemPrompt: 'You are the BulleBrowser agent.',
       history: [],
       userMessage: 'click "submit"',
-      context: makeContext({
-        confirmDestructive: vi.fn(async () => false),
-      }),
-      onStep: () => {},
+      context: makeContext({ confirmDestructive }),
+      onStep: (s) => steps.push(s),
     });
 
-    expect(out).toContain('Failure');
-    expect(out).toContain('User declined confirmation');
+    expect(confirmDestructive).toHaveBeenCalledOnce();
+    expect(
+      steps.some((s) => s.type === 'error' && (s.detail ?? '').includes('User declined confirmation')),
+    ).toBe(true);
+    // The decline is reported back to the model as an error tool_result.
+    const secondCall = createMock.mock.calls[1]?.[0] as {
+      messages: Array<{ role: string; content: unknown }>;
+    };
+    const toolResultTurn = secondCall.messages.find(
+      (m) => m.role === 'user' && Array.isArray(m.content),
+    );
+    const block = (toolResultTurn?.content as Array<{ is_error?: boolean; content: unknown }>)?.[0];
+    expect(block?.is_error).toBe(true);
+    expect(out).toContain('did not submit');
+  });
+
+  it('surfaces a real error (does not fake an answer) when no API key is set', async () => {
+    await expect(
+      runAgent({
+        model: DEFAULT_MODEL,
+        systemPrompt: 'x',
+        history: [],
+        userMessage: 'hello',
+        context: makeContext(),
+        onStep: () => {},
+      }),
+    ).rejects.toThrow(/API key/);
+    expect(createMock).not.toHaveBeenCalled();
   });
 });

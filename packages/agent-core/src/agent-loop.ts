@@ -1,146 +1,277 @@
-import { executePlan } from './executor.js';
+// The BulleBrowser agent loop.
+//
+// This is a real Claude tool-use loop: the model is given the browser tool
+// surface (navigate, read_page, click, type, …) and driven in a
+// perceive → decide → act → observe cycle. Claude chooses which tools to call
+// based on the running results, so the agent can actually browse — search,
+// follow links, read multiple tabs — and synthesize a grounded answer, rather
+// than executing a fixed, pre-baked plan.
+//
+// The desktop main process injects a ToolRuntime (via ToolContext) that maps
+// each tool onto the active WebContentsView, and forwards every step to the
+// renderer through `onStep`.
+
+import Anthropic from '@anthropic-ai/sdk';
 import { SessionMemoryStore } from './memory.js';
-import { planTask } from './planner.js';
 import { PrivacyPolicyEngine } from './policy.js';
-import { AnthropicSynthesisProvider, LocalSynthesisProvider } from './provider.js';
 import { retrieveContext } from './retrieval.js';
-import { AuditLogger } from './audit.js';
+import { getTool, zodToJsonSchema } from './tools/index.js';
 import {
   MAX_TOOL_CALLS_PER_TASK,
   type AgentInput,
+  type AgentStepHandler,
   type ClaudeModelId,
-  type ExecutionPlan,
+  type PlanStep,
+  type ToolContext,
+  type ToolName,
 } from './types.js';
 
 export const DEFAULT_MODEL: ClaudeModelId = 'claude-opus-4-7';
 
-function shouldUseExternalProvider(): boolean {
-  return process.env.BULLE_AGENT_USE_EXTERNAL_PROVIDER === '1';
+// Max tokens for each model turn. Well under the SDK's non-streaming HTTP
+// timeout while leaving room for a substantial final report.
+const MAX_TOKENS_PER_TURN = 4096;
+
+// The tools we expose to the model. This is a curated subset of the registry:
+// the primary, well-described tools (using the same names referenced in the
+// system prompt) rather than every legacy alias, so the model isn't offered
+// three ways to do the same thing.
+const AGENT_TOOL_NAMES: ToolName[] = [
+  'navigate',
+  'read_page',
+  'getPageMetadata',
+  'list_tabs',
+  'new_tab',
+  'switch_tab',
+  'close_tab',
+  'go_back',
+  'go_forward',
+  'reload',
+  'click',
+  'type',
+  'press_key',
+  'scroll',
+  'wait_for',
+  'extract',
+  'listLinks',
+  'getSelection',
+  'screenshot',
+];
+
+function buildToolDefs(): Anthropic.Tool[] {
+  const defs: Anthropic.Tool[] = [];
+  for (const name of AGENT_TOOL_NAMES) {
+    const tool = getTool(name);
+    if (!tool) continue;
+    defs.push({
+      name: tool.name,
+      description: tool.description,
+      input_schema: zodToJsonSchema(tool.inputSchema) as Anthropic.Tool.InputSchema,
+    });
+  }
+  return defs;
 }
 
-function formatPlan(plan: ExecutionPlan): string {
-  const lines = [
-    `Goal: ${plan.goal}`,
-    `Why: ${plan.rationale}`,
-    'Steps:',
-    ...plan.steps.map((s, i) => `${i + 1}. ${s.toolName} - ${s.expected}`),
-  ];
-  return lines.join('\n');
+function truncate(value: string, max: number): string {
+  return value.length > max ? `${value.slice(0, max)}… [truncated]` : value;
 }
 
-function makeFinalReport(params: {
-  plan: ExecutionPlan;
-  results: Array<{ ok: boolean; output?: unknown; reason?: string }>;
-  providerText: string;
-  url?: string;
-}): string {
-  const successCount = params.results.filter((r) => r.ok).length;
-  const failed = params.results.find((r) => !r.ok);
+// Compact, IPC-safe preview of a tool's output for the step stream. Keeps large
+// blobs (screenshot base64, full page text) out of the renderer feed.
+function previewOutput(output: unknown): unknown {
+  if (output && typeof output === 'object') {
+    const rec = output as Record<string, unknown>;
+    if (typeof rec.pngBase64 === 'string') {
+      return { pngBase64: `<png ${rec.pngBase64.length} bytes>` };
+    }
+    if (typeof rec.text === 'string') {
+      return { ...rec, text: truncate(rec.text, 400) };
+    }
+  }
+  if (typeof output === 'string') return truncate(output, 400);
+  return output;
+}
 
-  const lines: string[] = [];
-  lines.push('Execution Report');
-  lines.push('');
-  lines.push(`Plan goal: ${params.plan.goal}`);
-  lines.push(`Completed steps: ${successCount}/${params.plan.steps.length}`);
-  if (failed?.reason) lines.push(`Failure: ${failed.reason}`);
-  if (params.url) lines.push(`Source: ${params.url}`);
-  lines.push('');
-  lines.push(params.providerText.trim());
+async function runToolCall(
+  toolUse: Anthropic.ToolUseBlock,
+  context: ToolContext,
+  policy: PrivacyPolicyEngine,
+  onStep: AgentStepHandler,
+): Promise<Anthropic.ToolResultBlockParam> {
+  const name = toolUse.name as ToolName;
+  const input = (toolUse.input ?? {}) as Record<string, unknown>;
+  const fail = (detail: string): Anthropic.ToolResultBlockParam => {
+    onStep({ type: 'error', toolName: name, detail });
+    return { type: 'tool_result', tool_use_id: toolUse.id, content: detail, is_error: true };
+  };
 
-  return lines.join('\n');
+  onStep({
+    type: 'tool_call',
+    toolName: name,
+    detail: `${name}(${truncate(JSON.stringify(input), 200)})`,
+    data: policy.redact(input),
+  });
+
+  const tool = getTool(name);
+  if (!tool) return fail(`Unknown tool: ${name}`);
+
+  // Privacy / safety policy: block sensitive actions outright, and require an
+  // explicit user confirmation for destructive ones (submit, purchase, delete…).
+  const step: PlanStep = { id: toolUse.id, toolName: name, input, expected: '' };
+  const decision = policy.evaluateToolStep(step);
+  if (!decision.allowed) return fail(decision.reason ?? 'Blocked by policy.');
+  if (decision.requiresConfirmation) {
+    const approved = await context.runtime.confirmDestructive(
+      `Confirm action: ${name} ${JSON.stringify(input)}`,
+    );
+    if (!approved) return fail(`User declined confirmation for ${name}.`);
+  }
+
+  try {
+    const parsed = tool.inputSchema.parse(input);
+    const output = await tool.execute(parsed, context);
+    onStep({ type: 'tool_result', toolName: name, data: policy.redact(previewOutput(output)) });
+
+    // Return the screenshot as an image block so the model can actually see the
+    // page, rather than dumping a giant base64 string into a text result.
+    if (
+      name === 'screenshot' &&
+      output &&
+      typeof output === 'object' &&
+      'pngBase64' in output
+    ) {
+      return {
+        type: 'tool_result',
+        tool_use_id: toolUse.id,
+        content: [
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: 'image/png',
+              data: (output as { pngBase64: string }).pngBase64,
+            },
+          },
+        ],
+      };
+    }
+
+    // The Anthropic Messages API requires tool_result.content to be a string or
+    // an array of content blocks — never a raw object. Stringify.
+    const text = typeof output === 'string' ? output : JSON.stringify(output);
+    return { type: 'tool_result', tool_use_id: toolUse.id, content: truncate(text, 100_000) };
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : 'Tool execution failed.');
+  }
 }
 
 export async function runAgent(input: AgentInput): Promise<string> {
-  const policy = new PrivacyPolicyEngine();
-  const memory = new SessionMemoryStore();
-  const audit = new AuditLogger();
+  const { context, onStep } = input;
 
-  if (input.context.signal.aborted) {
-    input.onStep({ type: 'error', detail: 'Cancelled by user.' });
+  if (context.signal.aborted) {
+    onStep({ type: 'error', detail: 'Cancelled by user.' });
     throw new Error('cancelled');
   }
 
-  input.onStep({ type: 'thinking', detail: 'Perceiving browser context…' });
-  audit.add('perceive', 'Starting contextual retrieval');
-
-  const retrieved = await retrieveContext(input.context, memory);
-  memory.put('last_url', retrieved.url, 15 * 60 * 1000);
-  memory.put('last_title', retrieved.title, 15 * 60 * 1000);
-
-  input.onStep({ type: 'thinking', detail: 'Planning actions…' });
-  const plan = planTask({
-    userMessage: input.userMessage,
-    currentUrl: retrieved.url,
-  });
-
-  if (plan.steps.length > MAX_TOOL_CALLS_PER_TASK) {
-    throw new Error(`Plan exceeds max tool calls (${MAX_TOOL_CALLS_PER_TASK}).`);
+  if (!input.apiKey) {
+    // Throw rather than return a canned string — otherwise the "answer" renders
+    // as a normal assistant message and the failure is invisible. Throwing routes
+    // it through the run's error channel so the chat shows a real error.
+    throw new Error(
+      'No Anthropic API key is configured. Open Settings and paste your key ' +
+        '(it is stored encrypted in your OS keychain) to enable the agent.',
+    );
   }
 
-  input.onStep({ type: 'text', detail: formatPlan(plan) });
-  audit.add('plan', 'Plan generated', plan);
+  const policy = new PrivacyPolicyEngine();
+  const memory = new SessionMemoryStore();
 
-  input.onStep({ type: 'thinking', detail: 'Executing plan…' });
-  const results = await executePlan(plan, input.context, policy, audit, (event) => {
-    if (event.type === 'tool_call') {
-      input.onStep({
-        type: 'tool_call',
-        toolName: event.toolName,
-        detail: event.detail,
-        data: policy.redact(event.data),
-      });
-      return;
+  onStep({ type: 'thinking', detail: 'Reading the current page…' });
+  const perceived = await retrieveContext(context, memory);
+
+  const contextNote = perceived.url
+    ? `\n\nCurrent browser context:\n- Active tab: ${perceived.title ?? 'Untitled'} — ${perceived.url}`
+    : '\n\nCurrent browser context: no page is loaded yet. Use `navigate` (for ' +
+      'example to a search engine) to begin.';
+  const system = `${input.systemPrompt}${contextNote}`;
+
+  const client = new Anthropic({ apiKey: input.apiKey });
+  const toolDefs = buildToolDefs();
+
+  // Adaptive thinking lets the model reason between tool calls, which markedly
+  // improves multi-step browsing. Supported on the Opus/Sonnet tiers but not on
+  // Haiku, so gate on the model. When on, give max_tokens extra headroom since
+  // thinking tokens count against it.
+  const supportsThinking = !input.model.startsWith('claude-haiku');
+  const maxTokens = supportsThinking ? 8192 : MAX_TOKENS_PER_TURN;
+  const thinking: Anthropic.ThinkingConfigParam | undefined = supportsThinking
+    ? { type: 'adaptive' }
+    : undefined;
+
+  const messages: Anthropic.MessageParam[] = [
+    ...input.history.map((m) => ({ role: m.role, content: m.content })),
+    { role: 'user', content: input.userMessage },
+  ];
+
+  let finalText = '';
+  let toolCalls = 0;
+
+  // Each iteration is one model turn. The loop bound is a hard safety backstop;
+  // the real limit is MAX_TOOL_CALLS_PER_TASK, enforced per tool call below.
+  for (let turn = 0; turn < MAX_TOOL_CALLS_PER_TASK + 5; turn++) {
+    if (context.signal.aborted) throw new Error('cancelled');
+
+    onStep({ type: 'thinking', detail: 'Thinking…' });
+
+    const response = await client.messages.create({
+      model: input.model,
+      max_tokens: maxTokens,
+      ...(thinking ? { thinking } : {}),
+      system,
+      tools: toolDefs,
+      messages,
+    });
+
+    const textParts = response.content
+      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+      .map((b) => b.text);
+    if (textParts.length > 0) {
+      finalText = textParts.join('\n\n').trim();
+      onStep({ type: 'text', detail: finalText });
     }
-    if (event.type === 'tool_result') {
-      input.onStep({
-        type: 'tool_result',
-        toolName: event.toolName,
-        data: policy.redact(event.data),
-      });
-      return;
+
+    if (response.stop_reason !== 'tool_use') break;
+
+    // Preserve the full assistant turn (text + tool_use blocks) so the next
+    // request carries the model's own reasoning and tool calls.
+    messages.push({ role: 'assistant', content: response.content });
+
+    const toolUses = response.content.filter(
+      (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use',
+    );
+    const toolResults: Anthropic.ToolResultBlockParam[] = [];
+    for (const toolUse of toolUses) {
+      if (context.signal.aborted) throw new Error('cancelled');
+      if (toolCalls >= MAX_TOOL_CALLS_PER_TASK) {
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: toolUse.id,
+          content: `Tool-call limit (${MAX_TOOL_CALLS_PER_TASK}) reached. Summarize what you have and stop.`,
+          is_error: true,
+        });
+        continue;
+      }
+      toolCalls += 1;
+      toolResults.push(await runToolCall(toolUse, context, policy, onStep));
     }
-    if (event.type === 'error') {
-      input.onStep({ type: 'error', toolName: event.toolName, detail: event.detail });
-      return;
-    }
-    input.onStep({ type: 'thinking', detail: event.detail });
-  });
 
-  const facts = results.filter((r) => r.ok).map((r) => r.output);
-  const externalDecision = policy.allowExternalProvider({
-    url: retrieved.url,
-    text: retrieved.textSnippet,
-  });
-
-  const provider =
-    shouldUseExternalProvider() && externalDecision.allowed
-      ? new AnthropicSynthesisProvider()
-      : new LocalSynthesisProvider();
-
-  if (provider.id === 'anthropic' && !externalDecision.allowed) {
-    audit.add('policy', 'External synthesis blocked', externalDecision.reason);
+    messages.push({ role: 'user', content: toolResults });
   }
 
-  input.onStep({ type: 'thinking', detail: 'Preparing final report…' });
-  const providerText = await provider.summarize({
-    model: input.model,
-    goal: plan.goal,
-    facts,
-    apiKey: input.apiKey,
-  });
-
-  const report = makeFinalReport({
-    plan,
-    results,
-    providerText,
-    url: retrieved.url,
-  });
-
-  audit.add('report', 'Final report generated', {
-    provider: provider.id,
-    records: audit.all().length,
-  });
-
-  input.onStep({ type: 'done' });
-  return report;
+  onStep({ type: 'done' });
+  return (
+    finalText ||
+    'I was unable to produce a final answer within the tool-call limit. ' +
+      'Please refine the task or ask me to continue.'
+  );
 }
