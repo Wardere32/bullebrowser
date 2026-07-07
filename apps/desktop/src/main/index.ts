@@ -6,6 +6,11 @@ import { createBrowserWindow } from './window.js';
 import { registerIpc } from './ipc-handlers.js';
 import { tabManager } from './tabs/manager.js';
 import { setupAutoUpdate } from './updater.js';
+import { loadDotEnv } from './env.js';
+
+// In development, pick up ANTHROPIC_API_KEY (and any other vars) from a local
+// .env so the agent is connected without re-entering the key in Settings.
+loadDotEnv([process.cwd(), app.getAppPath()]);
 
 // Hard-quit if a second instance launches; the first instance focuses its window.
 const gotLock = app.requestSingleInstanceLock();

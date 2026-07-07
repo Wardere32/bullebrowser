@@ -11,8 +11,13 @@ interface SecretSchema extends Record<string, unknown> {
 
 const store = createStore<SecretSchema>('secrets', { apiKeyEncrypted: null });
 
+function apiKeyFromEnv(): string | null {
+  const fromEnv = process.env.ANTHROPIC_API_KEY?.trim();
+  return fromEnv ? fromEnv : null;
+}
+
 export function hasApiKey(): boolean {
-  return store.get('apiKeyEncrypted') !== null;
+  return store.get('apiKeyEncrypted') !== null || apiKeyFromEnv() !== null;
 }
 
 export function setApiKey(plain: string): void {
@@ -36,13 +41,17 @@ export function setApiKey(plain: string): void {
 }
 
 export function getApiKey(): string | null {
+  // A key saved in Settings (encrypted in the OS keychain) always wins.
   const cipher = store.get('apiKeyEncrypted');
-  if (!cipher) return null;
-  try {
-    return safeStorage.decryptString(Buffer.from(cipher, 'base64'));
-  } catch {
-    return null;
+  if (cipher) {
+    try {
+      return safeStorage.decryptString(Buffer.from(cipher, 'base64'));
+    } catch {
+      // Fall through to the environment fallback below.
+    }
   }
+  // Otherwise fall back to ANTHROPIC_API_KEY (loaded from .env in dev).
+  return apiKeyFromEnv();
 }
 
 export function clearApiKey(): void {

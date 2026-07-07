@@ -34,10 +34,16 @@ const BASE_SYSTEM = [
   'go_forward, reload, list_tabs, wait_for).',
   '',
   'Operating principles:',
+  '- To find information you do not already have, browse for it: navigate to a',
+  '  search engine (e.g. https://duckduckgo.com/?q=... or',
+  '  https://www.google.com/search?q=...), read_page the results, then navigate',
+  '  into the most relevant links and read those pages before answering.',
   '- Prefer read_page before click; prefer extract over guessing.',
   '- To summarize or compare multiple open tabs, call list_tabs then read_page',
   '  with each tabId — no need to switch focus.',
   '- After typing into a search box, call press_key with Enter to submit.',
+  '- Ground every claim in a page you actually read this task; do not answer',
+  '  from memory when the answer depends on current or page-specific facts.',
   '- Never submit forms that send the user\'s data, complete purchases, or',
   '  download files without explicit user confirmation.',
   '- Cite URLs in your final answer.',
@@ -122,10 +128,9 @@ export async function startAgentRun(
         },
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Agent run failed';
       win.webContents.send(IPC.AGENT_STEP, {
         runId,
-        step: { kind: 'error', message, ts: Date.now() } satisfies AgentStepEvent,
+        step: { kind: 'error', message: describeAgentError(err), ts: Date.now() } satisfies AgentStepEvent,
       });
     } finally {
       if (assistantText) {
@@ -156,6 +161,21 @@ export function replyAgentConfirm(runId: string, id: string, approved: boolean) 
     resolver(approved);
     run?.pendingConfirms.delete(id);
   }
+}
+
+// Turn a thrown agent error into a clear, actionable message for the chat UI,
+// so failures (bad key, rate limit, no network) are surfaced instead of silent.
+function describeAgentError(err: unknown): string {
+  const status = (err as { status?: number })?.status;
+  const raw = err instanceof Error ? err.message : '';
+  if (status === 401) return 'Anthropic rejected your API key (401). Check it in Settings.';
+  if (status === 403) return 'Your Anthropic API key lacks access to this model (403).';
+  if (status === 429) return 'Anthropic rate limit reached (429). Wait a moment and try again.';
+  if (status && status >= 500) return `Anthropic service error (${status}). Please retry shortly.`;
+  if (/fetch failed|ENOTFOUND|ECONNREFUSED|EAI_AGAIN|network|timed out/i.test(raw)) {
+    return 'Could not reach Anthropic. Check your internet connection and try again.';
+  }
+  return raw || 'The agent run failed unexpectedly.';
 }
 
 function stepToEvent(step: AgentStep): AgentStepEvent {
