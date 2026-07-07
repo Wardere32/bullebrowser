@@ -160,25 +160,25 @@ export function AiPanel() {
   };
 
   return (
-    <aside className="flex w-[440px] flex-col border-l border-line/30 bg-surface-light">
-      <header className="flex items-center justify-between gap-2 border-b border-line/60 px-3 py-2">
-        <div className="text-sm font-semibold text-ink-primary">BulleBrowser Agent</div>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={createConversation}
-            className="rounded px-2 py-1 text-xs text-ink-secondary hover:bg-surface-muted"
-          >
-            New chat
-          </button>
+    <aside className="flex w-[440px] flex-col border-l border-line/25 bg-surface-light">
+      <header className="flex items-center justify-between gap-2 px-4 py-3">
+        <div className="text-[13px] font-semibold tracking-tight text-ink-primary">
+          BulleBrowser Agent
         </div>
+        <button
+          type="button"
+          onClick={createConversation}
+          className="rounded-md px-2 py-1 text-xs text-ink-secondary transition-colors hover:text-ink-primary"
+        >
+          New chat
+        </button>
       </header>
 
-      <div className="flex items-center gap-2 border-b border-line/60 bg-surface-muted px-3 py-2 text-xs">
+      <div className="flex items-center gap-3 px-4 pb-2 text-xs">
         <select
           value={skillId}
           onChange={(e) => setSkillId(e.target.value)}
-          className="flex-1 rounded border border-line bg-white px-2 py-1 text-ink-primary"
+          className="flex-1 rounded-md bg-transparent py-1 text-ink-secondary transition-colors hover:text-ink-primary focus:outline-none"
         >
           <option value="">Skills: free chat</option>
           {skills.map((s) => (
@@ -190,7 +190,7 @@ export function AiPanel() {
         <select
           value={model}
           onChange={(e) => setModel(e.target.value as ClaudeModelId)}
-          className="rounded border border-line bg-white px-2 py-1 text-ink-primary"
+          className="rounded-md bg-transparent py-1 text-ink-secondary transition-colors hover:text-ink-primary focus:outline-none"
         >
           {MODELS.map((m) => (
             <option key={m.id} value={m.id}>
@@ -200,17 +200,17 @@ export function AiPanel() {
         </select>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-3 py-3">
+      <div className="flex-1 overflow-y-auto px-5 py-5">
         {current && current.messages.length === 0 && <EmptyState />}
         {current?.messages.map((m, i) => (
           <Bubble key={i} role={m.role} content={m.content} />
         ))}
         {(status === 'running' || status === 'error') && (
           <div
-            className={`my-2 space-y-1 rounded border p-2 text-[11px] ${
+            className={`mb-5 space-y-1 text-[11px] ${
               status === 'error'
-                ? 'border-danger/40 bg-danger/5 text-ink-primary'
-                : 'border-line bg-surface-muted text-ink-secondary'
+                ? 'rounded-md bg-danger/5 px-3 py-2 text-danger'
+                : 'px-1 text-ink-secondary'
             }`}
           >
             {steps.slice(-6).map((s, i) => (
@@ -223,7 +223,7 @@ export function AiPanel() {
         )}
       </div>
 
-      <footer className="border-t border-line/60 p-2">
+      <footer className="border-t border-line/25 p-3">
         {draft.startsWith('/') && !draft.includes(' ') && (
           <div className="mb-1 max-h-32 overflow-y-auto rounded border border-line bg-white text-[11px]">
             {SLASH_COMMANDS.filter((c) => c.name.startsWith(draft.toLowerCase())).map(
@@ -252,7 +252,9 @@ export function AiPanel() {
         <div className="flex items-end gap-2">
           <div className="flex-1">
             <div
-              className={`prompt-input-shell prompt-input-shell--${promptActivity.state}`}
+              className={`prompt-input-shell prompt-input-shell--chat prompt-input-shell--${promptActivity.state}${
+                runInProgress ? ' prompt-input-shell--working' : ''
+              }`}
               data-activity-state={promptActivity.state}
               onMouseDown={(e) => {
                 if (e.target === e.currentTarget) {
@@ -311,18 +313,21 @@ export function AiPanel() {
 
 function EmptyState() {
   return (
-    <div className="space-y-3 text-sm text-ink-primary">
-      <div className="font-semibold">BulleBrowser Agent is ready.</div>
-      <p className="text-ink-secondary">
-        Type a task in the box below and BulleBrowser will use your live tabs to
-        browse, read, compare, and complete the task. This desktop experience is
-        agent-first; the website is just the brand surface.
+    <div className="space-y-6 pt-2 text-sm">
+      <p className="text-[15px] font-semibold tracking-tight text-ink-primary">
+        What can I help you browse?
       </p>
-      <div className="space-y-2 rounded border border-line bg-surface-muted p-3">
+      <p className="leading-relaxed text-ink-secondary">
+        Describe a task and I'll use your live tabs to browse, read, compare, and
+        report back.
+      </p>
+      <div className="space-y-3">
         {skills.map((s) => (
           <div key={s.id}>
-            <div className="text-xs font-semibold">{s.label}</div>
-            <div className="text-[11px] text-ink-secondary">{s.shortDescription}</div>
+            <div className="text-[13px] font-medium text-ink-primary">{s.label}</div>
+            <div className="text-xs leading-relaxed text-ink-secondary">
+              {s.shortDescription}
+            </div>
           </div>
         ))}
       </div>
@@ -333,16 +338,18 @@ function EmptyState() {
 function Bubble({ role, content }: { role: 'user' | 'assistant'; content: string }) {
   if (role === 'user') {
     return (
-      <div className="my-2 ml-6 rounded-lg bg-primary px-3 py-2 text-sm text-white">
-        {content}
+      <div className="mb-6 flex justify-end">
+        <div className="max-w-[85%] rounded-2xl bg-primary px-3.5 py-2 text-sm leading-relaxed text-white">
+          {content}
+        </div>
       </div>
     );
   }
+  // Assistant replies read as plain prose — no card, no border — for a calm,
+  // document-like feel.
   return (
-    <div className="my-2 mr-6 rounded-lg border border-line bg-white p-3">
-      <div className="md-prose">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-      </div>
+    <div className="mb-6 md-prose">
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
     </div>
   );
 }

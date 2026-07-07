@@ -176,6 +176,98 @@ textarea {
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* Chat input: animated rotating gradient halo (scoped to the AI panel */
+/* input only — the shared shell is also used by the top-bar address   */
+/* field, which must stay quiet). A conic gradient painted into a 1.5px */
+/* border ring via a mask, rotated by animating a custom angle prop.    */
+/* Idle: a whisper. Focused / working: bright and slowly rotating.      */
+/* ------------------------------------------------------------------ */
+@property --halo-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+/* Keep the chat shell's own border neutral in every state — the halo is
+   the focus/activity signal, not a colored border. */
+.prompt-input-shell--chat,
+.prompt-input-shell--chat.prompt-input-shell--focus,
+.prompt-input-shell--chat.prompt-input-shell--typing,
+.prompt-input-shell--chat.prompt-input-shell--cooldown {
+  border-color: #e5e9f0;
+}
+
+/* Suppress the generic box-glow on the chat variant; the ring replaces it. */
+.prompt-input-shell--chat::after {
+  content: none;
+}
+
+.prompt-input-shell--chat::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 9px; /* shell radius (8) + inset */
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--halo-angle),
+    rgba(59, 130, 246, 0) 0deg,
+    rgba(59, 130, 246, 0.85) 70deg,
+    rgba(129, 140, 248, 0.9) 140deg,
+    rgba(59, 130, 246, 0) 250deg,
+    rgba(59, 130, 246, 0) 360deg
+  );
+  /* Paint only the padding ring: fill everything, then punch out the
+     content box so just the 1.5px border remains. */
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 260ms ease;
+  animation: halo-rotate 6s linear infinite;
+  pointer-events: none;
+}
+
+/* Idle — barely-there ring so the control feels alive but calm. */
+.prompt-input-shell--chat.prompt-input-shell--idle::before {
+  opacity: 0.14;
+}
+
+/* Focused / cooling down — clearly visible, unhurried. */
+.prompt-input-shell--chat.prompt-input-shell--focus::before,
+.prompt-input-shell--chat.prompt-input-shell--cooldown::before {
+  opacity: 0.6;
+}
+
+/* Typing or agent working — brightest, a touch faster. Listed last so it
+   wins over idle/focus when several state classes are present. */
+.prompt-input-shell--chat.prompt-input-shell--typing::before,
+.prompt-input-shell--chat.prompt-input-shell--working::before {
+  opacity: 0.95;
+  animation-duration: 3.5s;
+}
+
+/* Disabled — no ring at all. */
+.prompt-input-shell--chat.prompt-input-shell--disabled::before {
+  opacity: 0;
+  animation: none;
+}
+
+@keyframes halo-rotate {
+  to {
+    --halo-angle: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Keep a static gradient ring, but never rotate it. */
+  .prompt-input-shell--chat::before {
+    animation: none;
+  }
+}
+
 /* Markdown styling for the AI panel chat bubbles */
 .md-prose {
   font-size: 13.5px;
