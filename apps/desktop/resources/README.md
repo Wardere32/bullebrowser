@@ -7,7 +7,8 @@ Files in this folder ship with the packaged app via `electron-builder`.
 | `icon.icns` | macOS .dmg / .zip | 1024×1024 master exported as `.icns` |
 | `icon.ico`  | Windows NSIS .exe | 256×256 multi-resolution `.ico` |
 | `icon.png`  | Linux .AppImage / .deb | 512×512 `.png` |
-| `entitlements.mac.plist` | macOS notarization | Already committed |
+| `entitlements.mac.plist` | macOS hardened runtime / notarization (wired via `electron-builder.yml` → `mac.entitlements`) | Already committed |
+| `entitlements.mac.inherit.plist` | Inherited entitlements for Electron helper processes (`mac.entitlementsInherit`) | Already committed |
 
 The committed SVGs in `packages/brand-tokens/assets/` are the source of
 truth for the wordmark and the rounded-square monogram. Generate the

@@ -1,0 +1,117 @@
+// afterSign hook — notarize, staple, and Gatekeeper-validate the signed .app.
+//
+// Runs after electron-builder has code-signed the app (with hardened runtime +
+// entitlements) and before the .dmg / .zip are built, so the notarization
+// ticket is stapled *inside* the distributed image.
+//
+// It shells out to the Xcode command-line tools (notarytool, stapler, spctl)
+// only — no npm dependency — so nothing needs to be added to the frozen pnpm
+// lockfile. Those tools ship with the macos runners.
+//
+// Behaviour:
+//   • Developer ID–signed app + Apple credentials present
+//         → submit to notarytool (--wait), staple, then verify with
+//           `stapler validate` and `spctl --assess --type execute`.
+//   • Release run (IS_RELEASE=1 — set by the CI job for tag pushes and
+//     publish dispatches) that is not properly signed, or with credentials
+//     missing
+//         → throw, so an un-notarized build can never be published.
+//   • Anything else (local dev, PRs, ad-hoc fallback builds)
+//         → warn and skip.
+//
+// Credentials (either set works; API key is preferred when present):
+//   APPLE_API_KEY (path to .p8) + APPLE_API_KEY_ID + APPLE_API_ISSUER
+//   APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD + APPLE_TEAM_ID
+
+const { execFileSync, spawnSync } = require('node:child_process');
+const path = require('node:path');
+const fs = require('node:fs');
+const os = require('node:os');
+
+function isDeveloperIdSigned(appPath) {
+  // `codesign -dvv` writes its details to stderr (and returns 0 on a valid
+  // signature), so read both streams via spawnSync rather than execFileSync,
+  // which returns stdout only.
+  const result = spawnSync('codesign', ['-dvv', appPath], { encoding: 'utf8' });
+  const combined = `${result.stdout ?? ''}${result.stderr ?? ''}`;
+  return /Authority=Developer ID Application/.test(combined);
+}
+
+// Returns notarytool credential args, or null when none are configured.
+function notaryCredentialArgs() {
+  const {
+    APPLE_API_KEY,
+    APPLE_API_KEY_ID,
+    APPLE_API_ISSUER,
+    APPLE_ID,
+    APPLE_APP_SPECIFIC_PASSWORD,
+    APPLE_TEAM_ID,
+  } = process.env;
+
+  if (APPLE_API_KEY && APPLE_API_KEY_ID && APPLE_API_ISSUER) {
+    return ['--key', APPLE_API_KEY, '--key-id', APPLE_API_KEY_ID, '--issuer', APPLE_API_ISSUER];
+  }
+  if (APPLE_ID && APPLE_APP_SPECIFIC_PASSWORD && APPLE_TEAM_ID) {
+    return ['--apple-id', APPLE_ID, '--password', APPLE_APP_SPECIFIC_PASSWORD, '--team-id', APPLE_TEAM_ID];
+  }
+  return null;
+}
+
+exports.default = async function afterSign(context) {
+  if (context.electronPlatformName !== 'darwin') return;
+
+  const appName = context.packager.appInfo.productFilename;
+  const appPath = path.join(context.appOutDir, `${appName}.app`);
+  const isRelease = process.env.IS_RELEASE === '1';
+
+  if (!fs.existsSync(appPath)) {
+    console.warn(`notarize: ${appPath} not found — skipping.`);
+    return;
+  }
+
+  const signed = isDeveloperIdSigned(appPath);
+  const creds = notaryCredentialArgs();
+
+  if (!signed || !creds) {
+    const why = !signed
+      ? 'the app is not Developer ID–signed'
+      : 'Apple notarization credentials are not set';
+    if (isRelease) {
+      throw new Error(
+        `notarize: refusing to publish an un-notarized release — ${why}. ` +
+          'Provide MACOS_CERTIFICATE / MACOS_CERTIFICATE_PASSWORD and either ' +
+          'APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID or ' +
+          'APPLE_API_KEY / APPLE_API_KEY_ID / APPLE_API_ISSUER.',
+      );
+    }
+    console.warn(`notarize: skipping (${why}). This build will NOT be notarized.`);
+    return;
+  }
+
+  const zipPath = path.join(os.tmpdir(), `${appName}-notarize-${process.pid}.zip`);
+  console.log(`notarize: zipping ${appName}.app for submission…`);
+  // ditto preserves the bundle structure and symlinks that notarytool expects.
+  execFileSync('ditto', ['-c', '-k', '--keepParent', appPath, zipPath], { stdio: 'inherit' });
+
+  try {
+    console.log('notarize: submitting to Apple notary service (this can take a few minutes)…');
+    // Credentials are passed as argv, not interpolated into a shell string, so
+    // the app-specific password / key is never expanded by a shell.
+    execFileSync('xcrun', ['notarytool', 'submit', zipPath, ...creds, '--wait'], {
+      stdio: 'inherit',
+    });
+  } finally {
+    fs.rmSync(zipPath, { force: true });
+  }
+
+  console.log('notarize: stapling the ticket to the .app…');
+  execFileSync('xcrun', ['stapler', 'staple', appPath], { stdio: 'inherit' });
+
+  console.log('notarize: validating staple + Gatekeeper acceptance…');
+  execFileSync('xcrun', ['stapler', 'validate', appPath], { stdio: 'inherit' });
+  execFileSync('spctl', ['--assess', '--type', 'execute', '--verbose=4', appPath], {
+    stdio: 'inherit',
+  });
+
+  console.log(`notarize: ✔ ${appName}.app is Developer ID–signed, notarized, stapled, and Gatekeeper-accepted.`);
+};

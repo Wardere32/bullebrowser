@@ -8,6 +8,10 @@ directories:
   buildResources: resources
 
 afterPack: ./scripts/after-pack.cjs
+# Notarize (via Apple's notarytool), staple, and Gatekeeper-validate the signed
+# .app. No-op on non-mac and on unsigned/ad-hoc builds; hard-fails a tagged
+# release that isn't properly Developer ID–signed. See scripts/notarize.cjs.
+afterSign: ./scripts/notarize.cjs
 
 files:
   - out/**/*
@@ -26,7 +30,15 @@ asarUnpack:
 mac:
   category: public.app-category.productivity
   hardenedRuntime: true
-  gatekeeperAssess: true
+  # We run our own spctl/stapler Gatekeeper check after notarization (a signed
+  # but not-yet-notarized app fails spctl, so an in-pack assess would break the
+  # build before notarization even runs). See scripts/notarize.cjs.
+  gatekeeperAssess: false
+  entitlements: resources/entitlements.mac.plist
+  entitlementsInherit: resources/entitlements.mac.inherit.plist
+  # Notarization is driven explicitly by the afterSign hook (notarytool), so
+  # electron-builder must not also attempt it.
+  notarize: false
   artifactName: "${productName}-${version}-${arch}.${ext}"
   target:
     - target: dmg

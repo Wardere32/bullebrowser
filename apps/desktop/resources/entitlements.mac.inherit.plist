@@ -3,6 +3,10 @@
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
   <dict>
+    <!-- Inherited by Electron helper (child) processes under the hardened
+         runtime. Must mirror the parent JIT / library-validation exceptions
+         and set com.apple.security.inherit so the sandbox/runtime flags flow
+         down from the main app. -->
     <key>com.apple.security.cs.allow-jit</key>
     <true/>
     <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
@@ -11,7 +15,7 @@
     <true/>
     <key>com.apple.security.cs.allow-dyld-environment-variables</key>
     <true/>
-    <key>com.apple.security.network.client</key>
+    <key>com.apple.security.inherit</key>
     <true/>
   </dict>
 </plist>
