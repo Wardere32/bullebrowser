@@ -46,10 +46,11 @@ export default function InstallPage() {
         <Step n={1} title="Open the installer">
           <p>
             <strong>macOS:</strong> open the <code>.dmg</code>, drag
-            BulleBrowser into Applications, then{' '}
-            <strong>right-click → Open → Open</strong> the first time (this
-            clears the unsigned-app prompt). If you see “is damaged,” run{' '}
-            <code>xattr -dr com.apple.quarantine /Applications/BulleBrowser.app</code>.
+            BulleBrowser into Applications, and double-click to launch. Official
+            releases are Developer ID–signed and notarized by Apple, so they open
+            normally. (Building from source? A dev build isn’t notarized —
+            right-click → Open → Open, or run{' '}
+            <code>xattr -dr com.apple.quarantine /Applications/BulleBrowser.app</code>.)
           </p>
           <p className="mt-2">
             <strong>Windows:</strong> run the <code>.exe</code>; if SmartScreen

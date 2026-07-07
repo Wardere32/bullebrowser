@@ -14,7 +14,8 @@ background needed.
 
 | Your computer | File to download |
 |---------------|------------------|
-| Mac | `BulleBrowser-<version>-universal.dmg` |
+| Mac (Apple Silicon) | `BulleBrowser-<version>-arm64.dmg` |
+| Mac (Intel) | `BulleBrowser-<version>-x64.dmg` |
 | Windows 10/11 | `BulleBrowser-Setup-<version>-x64.exe` |
 | Windows on ARM | `BulleBrowser-Setup-<version>-arm64.exe` |
 | Linux (most PCs) | `BulleBrowser-<version>-x86_64.AppImage` |
@@ -27,23 +28,19 @@ Not sure which Mac you have? Apple menu →  **About This Mac**. If it says
 
 ## 2. Install & first launch
 
-BulleBrowser is currently distributed **unsigned** (no paid Apple/Microsoft
-developer certificate yet), so your OS will show a one-time safety prompt.
-This is expected — here's how to get past it.
-
 ### macOS
-1. Open the `.dmg` and drag **BulleBrowser** into **Applications**.
-2. In Applications, **right-click** BulleBrowser → **Open** → **Open**.
-   (Right-clicking is the key step — double-clicking the first time may say
-   the app "can't be opened".)
-3. After this one time, it launches normally from the Dock.
+Official releases are **Developer ID–signed and notarized by Apple**, so they
+open normally — no security workaround needed.
 
-If you ever see *"BulleBrowser is damaged"*, it's just the quarantine flag.
-Open Terminal and run:
-```bash
-xattr -dr com.apple.quarantine /Applications/BulleBrowser.app
-```
-then open it again.
+1. Open the `.dmg` and drag **BulleBrowser** into **Applications**.
+2. Double-click **BulleBrowser** in Applications to launch it.
+
+> Building from source or running an unofficial/dev build? Those aren't
+> notarized, so macOS may say the app "can't be opened" or "is damaged."
+> Right-click → **Open** → **Open**, or clear the quarantine flag:
+> ```bash
+> xattr -dr com.apple.quarantine /Applications/BulleBrowser.app
+> ```
 
 ### Windows
 1. Run `BulleBrowser-Setup-…exe`.
@@ -76,14 +73,16 @@ Get-FileHash .\BulleBrowser-Setup-*.exe -Algorithm SHA256
 
 ## 4. Open the assistant
 
-BulleBrowser can run without a provider key. If you later want external
-synthesis, add a supported key from your AI provider account.
+BulleBrowser is bring-your-own-key: add your **Anthropic API key** in
+**Settings** (it's stored encrypted in your OS keychain and used only to talk
+to Anthropic). The agent needs it to browse and answer.
 
 1. Open the **assistant panel** (the **Your Assistant** button, or
    `Ctrl/Cmd + Shift + A`).
 2. Choose a preset skill if you want a guided workflow, or just describe
    what you need in plain language.
-3. The agent will browse the live tab and return a result summary.
+3. The agent browses your live tabs — navigating, reading, and following
+   links as needed — then returns a grounded answer with sources.
 
 Preset **Skills**:
 - **Page assistant** — read and summarize the current page.
@@ -108,10 +107,9 @@ Preset **Skills**:
 
 | Problem | Fix |
 |---------|-----|
-| Mac: "can't be opened" | Right-click → Open → Open (step 2 above). |
-| Mac: "is damaged" | Run the `xattr -dr` command above. |
+| Mac: "can't be opened" / "is damaged" | Official releases are notarized and open normally. If you're on a source/dev build, right-click → Open → Open, or run the `xattr -dr` command above. |
 | Windows: SmartScreen blocks it | More info → Run anyway. |
-| AI panel asks for a key | That is optional; continue using the local assistant, or add a key later in Settings if you want external synthesis. |
+| AI panel asks for a key | Add your Anthropic API key in Settings — the agent needs it to browse and answer. |
 | Agent can't read a page | Some PDFs/non-HTML pages aren't readable; paste the text or use an HTML version. |
 | Updates | BulleBrowser checks GitHub Releases and updates itself on the next launch. |
 

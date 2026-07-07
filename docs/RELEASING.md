@@ -10,15 +10,32 @@ Configure the following under **Settings → Secrets and variables → Actions**
 
 | Secret | Used by | Purpose |
 |---|---|---|
-| `MACOS_CERTIFICATE` | `build-desktop.yml` | Base64 of the `.p12` Developer ID Application certificate |
+| `MACOS_CERTIFICATE` | `build-desktop.yml` | Base64 of the `.p12` **Developer ID Application** certificate |
 | `MACOS_CERTIFICATE_PASSWORD` | `build-desktop.yml` | Password for the `.p12` |
-| `APPLE_ID` | `build-desktop.yml` | Apple ID used for notarization |
-| `APPLE_APP_SPECIFIC_PASSWORD` | `build-desktop.yml` | App-specific password generated at appleid.apple.com |
-| `APPLE_TEAM_ID` | `build-desktop.yml` | 10-character Apple Developer Team ID |
 | `WINDOWS_CERTIFICATE` | `build-desktop.yml` | Base64 of the `.pfx` Authenticode signing certificate |
-
-> Important: macOS public releases (tagged `v*.*.*`) must be signed and notarized with a valid Apple Developer certificate and Apple ID to avoid Gatekeeper malware warnings. The workflow now hard-fails tagged releases if notarization secrets are missing, preventing distribution of un-notarized public DMGs.
 | `WINDOWS_CERTIFICATE_PASSWORD` | `build-desktop.yml` | Password for the `.pfx` |
+
+Plus **one** of the two macOS notarization credential sets:
+
+| Apple-ID method | Purpose |
+|---|---|
+| `APPLE_ID` | Apple ID used for notarization |
+| `APPLE_APP_SPECIFIC_PASSWORD` | App-specific password generated at appleid.apple.com |
+| `APPLE_TEAM_ID` | 10-character Apple Developer Team ID |
+
+| App Store Connect API-key method (preferred) | Purpose |
+|---|---|
+| `APPLE_API_KEY` | Base64 of the `.p8` API key (decoded to a temp file in CI) |
+| `APPLE_API_KEY_ID` | Key ID of the App Store Connect API key |
+| `APPLE_API_ISSUER` | Issuer ID of the App Store Connect API key |
+
+> **Important:** macOS public releases (tagged `v*.*.*`) must be Developer ID–signed
+> and notarized so Gatekeeper accepts them without any "unidentified developer" /
+> "is damaged" prompt. The workflow **hard-fails** a tagged release when the
+> signing/notarization secrets are missing, and the afterSign hook
+> (`apps/desktop/scripts/notarize.cjs`) hard-fails if the produced app isn't
+> notarized + stapled + Gatekeeper-accepted — so an un-notarized DMG can never
+> be published. Non-tag runs fall back to an ad-hoc-signed build for testing.
 
 The landing page deploys to **GitHub Pages** — no third-party host and
 no secrets required.
@@ -75,8 +92,14 @@ git push origin "$TAG"
 The push to a `v*.*.*` tag triggers `build-desktop.yml`, which:
 
 1. Runs typecheck + tests in parallel on macOS, Windows, and Linux runners.
-2. Builds the Electron app on each platform with code signing.
-3. Notarizes the macOS build via `notarytool`.
+2. Builds the Electron app on each platform with code signing. On macOS the
+   app is **Developer ID–signed** with hardened runtime + entitlements
+   (`resources/entitlements.mac.plist` / `entitlements.mac.inherit.plist`).
+3. **Notarizes** the macOS app via `xcrun notarytool submit --wait`,
+   **staples** the ticket (`xcrun stapler staple`), and **validates**
+   Gatekeeper acceptance (`stapler validate` + `spctl --assess --type execute`)
+   in the afterSign hook — then a separate workflow step re-verifies the
+   produced `.app` bundles. Any failure on a tagged release aborts the run.
 4. Computes SHA-256 checksums.
 5. Publishes a GitHub Release with all installers and `checksums.txt`
    attached, plus auto-generated notes from Conventional Commits since
