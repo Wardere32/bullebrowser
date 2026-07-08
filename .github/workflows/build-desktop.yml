@@ -364,7 +364,10 @@ jobs:
     name: Publish GitHub Release
     needs: build
     runs-on: ubuntu-22.04
-    if: always() && (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_release == 'true' && github.event.inputs.version != ''))
+    # No always(): if the build job fails (e.g. macOS signing/notarization did
+    # not pass on a release run), this job is skipped and nothing is published —
+    # so a partial or un-notarized release can never go out.
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_release == 'true' && github.event.inputs.version != '')
     steps:
       - uses: actions/checkout@v4
         with:
