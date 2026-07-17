@@ -63,8 +63,8 @@ function decrypt(stored: string): string | null {
 // Each provider's key has a recognizable prefix; checking it catches the very
 // common paste error of putting a key in the wrong provider's box.
 const KEY_SHAPE: Record<ProviderId, { prefix: RegExp; label: string }> = {
-  anthropic: { prefix: /^sk-ant-/, label: "an Anthropic key (starts with 'sk-ant-')" },
-  openai: { prefix: /^sk-/, label: "an OpenAI key (starts with 'sk-')" },
+  anthropic: { prefix: /^sk-ant-/, label: "a key starting with 'sk-ant-'" },
+  openai: { prefix: /^sk-/, label: "a key starting with 'sk-'" },
 };
 
 function envKey(provider: ProviderId): string | null {

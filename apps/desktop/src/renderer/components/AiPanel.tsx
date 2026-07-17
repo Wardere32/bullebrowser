@@ -150,9 +150,9 @@ export function AiPanel() {
     textareaRef.current?.focus();
   }, [current, status]);
 
-  // Each assistant authenticates with its own provider's key, so switching
-  // between Claude and ChatGPT has to re-check — otherwise picking ChatGPT with
-  // only an Anthropic key saved would show a working chat that 401s on send.
+  // Each assistant has its own credential, so switching engines has to
+  // re-check — otherwise picking one whose key isn't saved would show a
+  // working chat that fails auth on send.
   useEffect(() => {
     void browserBridge()
       .secrets.hasApiKey(providerFor(model))
@@ -378,7 +378,7 @@ function ConnectKey({ model, onConnected }: { model: ModelId; onConnected: () =>
   return (
     <div className="space-y-4 pt-2 text-sm">
       <p className="text-[15px] font-semibold tracking-tight text-ink-primary">
-        Connect {assistant?.label ?? 'your assistant'}
+        Connect {assistant?.label ?? 'BulleBrowser AI'}
       </p>
       <p className="leading-relaxed text-ink-secondary">
         BulleBrowser needs your {assistant?.label ?? ''} key before it can browse

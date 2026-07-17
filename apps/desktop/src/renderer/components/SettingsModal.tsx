@@ -47,9 +47,9 @@ export function SettingsModal() {
     setSavedAt(Date.now());
   };
 
-  // Everything below keys off the assistant currently chosen, so switching to
-  // ChatGPT asks for an OpenAI key rather than reporting the Anthropic one as
-  // "saved" and then 401ing on the first message.
+  // Everything below keys off the assistant currently chosen: each engine has
+  // its own credential, so switching asks for that engine's key rather than
+  // reporting another one as "saved" and then failing auth on the first send.
   const provider = providerFor(settings.defaultModel);
   const assistantLabel = MODELS.find((m) => m.id === settings.defaultModel)?.label ?? 'Assistant';
   const keyPlaceholder = provider === 'openai' ? 'sk-…' : 'sk-ant-…';

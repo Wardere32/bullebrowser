@@ -329,3 +329,89 @@ textarea {
   color: #2563eb;
   text-decoration: underline;
 }
+
+/* ---------------------------------------------------------------------------
+   Start-page logo: fade in, hold, shine, fade out, loop.
+
+   One 9s cycle so it reads as a slow breath rather than a blink: ~1.2s in,
+   a long hold, the shine sweeping across near the end, then ~1.2s out and a
+   beat of rest before it comes back.
+
+   The shine is masked to the logo's own alpha (mask-image: url(...)) so the
+   highlight travels over the mark's shapes instead of a rectangle around it.
+   --------------------------------------------------------------------------- */
+
+.splash-logo {
+  position: relative;
+  display: inline-block;
+  /* Contain the sweep so it can't bleed past the mark. */
+  overflow: hidden;
+  animation: splash-breathe 9s ease-in-out infinite;
+}
+
+.splash-logo__img {
+  display: block;
+}
+
+.splash-logo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* A narrow band of light, angled so it reads as a specular sweep. */
+  background: linear-gradient(
+    100deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.1) 45%,
+    rgba(255, 255, 255, 0.85) 50%,
+    rgba(255, 255, 255, 0.1) 55%,
+    transparent 65%
+  );
+  background-size: 300% 100%;
+  background-repeat: no-repeat;
+  /* Clip the light to the logo's silhouette. */
+  -webkit-mask-image: var(--splash-logo-mask);
+  mask-image: var(--splash-logo-mask);
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  opacity: 0;
+  animation: splash-shine 9s ease-in-out infinite;
+}
+
+.splash-tagline {
+  animation: splash-breathe 9s ease-in-out infinite;
+}
+
+@keyframes splash-breathe {
+  0% { opacity: 0; }
+  14% { opacity: 1; }   /* faded in */
+  78% { opacity: 1; }   /* held, shine happens in here */
+  92% { opacity: 0; }   /* faded out */
+  100% { opacity: 0; }  /* rest before looping */
+}
+
+/* Sweeps across at the end of the hold, just before the fade-out. */
+@keyframes splash-shine {
+  0%, 60% { background-position: 150% 0; opacity: 0; }
+  64% { opacity: 1; }
+  76% { background-position: -50% 0; opacity: 1; }
+  80%, 100% { background-position: -50% 0; opacity: 0; }
+}
+
+/* Motion is decorative here: show the logo, steady and legible, and skip both
+   the pulse and the sweep entirely. */
+@media (prefers-reduced-motion: reduce) {
+  .splash-logo,
+  .splash-tagline {
+    animation: none;
+    opacity: 1;
+  }
+  .splash-logo::after {
+    animation: none;
+    opacity: 0;
+  }
+}

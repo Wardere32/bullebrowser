@@ -13,7 +13,7 @@ export default function DownloadPage() {
   return (
     <div className="mx-auto max-w-4xl px-6 py-16">
       <div className="mb-6 inline-flex items-center gap-3 rounded-full border border-line bg-surface-muted px-4 py-2">
-        <Image src={asset('/wordmark.png')} alt={product.name} width={158} height={24} />
+        <Image src={asset('/wordmark.png')} alt={product.name} width={178} height={60} />
         <span className="text-xs text-ink-secondary">Official BulleBrowser downloads</span>
       </div>
       <h1 className="text-3xl font-bold">Download {product.name}</h1>

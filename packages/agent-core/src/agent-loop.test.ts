@@ -299,12 +299,13 @@ describe('runAgent Claude tool-use loop', () => {
         context: makeContext(),
         onStep: () => {},
       }),
-    ).rejects.toThrow(/Anthropic key/);
+    ).rejects.toThrow(/BulleBrowser Pro needs its key/);
     expect(createMock).not.toHaveBeenCalled();
   });
 
-  // Naming the wrong vendor's key sends the user to the wrong dashboard.
-  it('names the provider whose key is missing', async () => {
+  // Client-facing copy is white-labelled: it names the assistant and the key
+  // prefix, never the vendor behind it.
+  it('names the assistant whose key is missing, not the vendor', async () => {
     await expect(
       runAgent({
         model: 'gpt-4o',
@@ -314,6 +315,17 @@ describe('runAgent Claude tool-use loop', () => {
         context: makeContext(),
         onStep: () => {},
       }),
-    ).rejects.toThrow(/OpenAI key/);
+    ).rejects.toThrow(/BulleBrowser Nova needs its key/);
+
+    await expect(
+      runAgent({
+        model: 'gpt-4o',
+        systemPrompt: 'x',
+        history: [],
+        userMessage: 'hello',
+        context: makeContext(),
+        onStep: () => {},
+      }),
+    ).rejects.not.toThrow(/OpenAI|ChatGPT|Anthropic|Claude/);
   });
 });

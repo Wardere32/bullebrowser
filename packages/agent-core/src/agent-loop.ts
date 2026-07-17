@@ -24,6 +24,7 @@ import {
 } from './openai-loop.js';
 import {
   MAX_TOOL_CALLS_PER_TASK,
+  assistantLabelFor,
   providerFor,
   type AgentInput,
   type AgentStepHandler,
@@ -258,12 +259,12 @@ export async function runAgent(input: AgentInput): Promise<string> {
     // Throw rather than return a canned string — otherwise the "answer" renders
     // as a normal assistant message and the failure is invisible. Throwing routes
     // it through the run's error channel so the chat shows a real error.
+    // White-labelled on purpose: no vendor name reaches the user. The key
+    // prefix is the only hint needed, and it's the thing they're pasting.
     throw new Error(
-      provider === 'openai'
-        ? 'ChatGPT needs an OpenAI key. Open Settings, choose ChatGPT, and paste ' +
-          'a key that starts with "sk-" — or switch the assistant back to Claude.'
-        : 'Claude needs an Anthropic key. Open Settings and paste a key that ' +
-          'starts with "sk-ant-" to enable the agent.',
+      `${assistantLabelFor(input.model)} needs its key before it can browse or ` +
+        `answer. Open Settings and paste a key starting with ` +
+        `"${provider === 'openai' ? 'sk-' : 'sk-ant-'}".`,
     );
   }
 

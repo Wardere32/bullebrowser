@@ -30,8 +30,8 @@ export default function InstallPage() {
   return (
     <div className="mx-auto max-w-3xl px-6 py-16">
       <div className="mb-6 inline-flex items-center gap-3 rounded-full border border-line bg-surface-muted px-4 py-2">
-        {/* 158×24 keeps the wordmark's 6.59:1 intrinsic ratio exactly. */}
-        <Image src={asset('/wordmark.png')} alt={product.name} width={158} height={24} />
+        {/* 178×60 matches the logo's 2.96:1 intrinsic ratio exactly. */}
+        <Image src={asset('/wordmark.png')} alt={product.name} width={178} height={60} />
         <span className="text-xs text-ink-secondary">Brand-authenticated installer path</span>
       </div>
       <h1 className="text-4xl font-bold">Install {product.name}</h1>

@@ -15,14 +15,22 @@ export function providerFor(model: ModelId): ProviderId {
   return model.startsWith('claude') ? 'anthropic' : 'openai';
 }
 
-// The two choices the user actually picks between. Each is a named assistant
-// backed by that vendor's strongest model for tool-driven browsing; the exact
-// model id stays an implementation detail so it can be upgraded without the
-// user's saved preference pointing at a retired model.
+// What the user picks between. The labels are deliberately white-labelled —
+// no vendor names anywhere client-facing — so the underlying model can be
+// swapped or upgraded without the product's surface changing. The `provider`
+// field is what actually routes the call; `label` is the only part a user sees.
 export const ASSISTANTS: { id: ModelId; label: string; provider: ProviderId }[] = [
-  { id: 'claude-opus-4-7', label: 'Claude', provider: 'anthropic' },
-  { id: 'gpt-4o', label: 'ChatGPT', provider: 'openai' },
+  { id: 'claude-opus-4-7', label: 'BulleBrowser Pro', provider: 'anthropic' },
+  { id: 'claude-sonnet-4-6', label: 'BulleBrowser Balanced', provider: 'anthropic' },
+  { id: 'claude-haiku-4-5-20251001', label: 'BulleBrowser Fastest', provider: 'anthropic' },
+  { id: 'gpt-4o', label: 'BulleBrowser Nova', provider: 'openai' },
 ];
+
+// Client-facing name for a provider's credential. Used in "connect your key"
+// copy, which must not name the vendor either.
+export function assistantLabelFor(model: ModelId): string {
+  return ASSISTANTS.find((a) => a.id === model)?.label ?? 'BulleBrowser AI';
+}
 
 export type ToolName =
   | 'getActiveTab'
