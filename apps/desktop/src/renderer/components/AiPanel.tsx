@@ -233,24 +233,15 @@ export function AiPanel() {
           current?.messages.map((m, i) => (
             <Bubble key={i} role={m.role} content={m.content} />
           ))}
-        <AllowAccess task={lastUserMessage} />
         {hasKey === true && (status === 'running' || status === 'error') && (
-          <div
-            className={`mb-5 space-y-1 text-[11px] ${
-              status === 'error'
-                ? 'rounded-md bg-danger/5 px-3 py-2 text-danger'
-                : 'px-1 text-ink-secondary'
-            }`}
-          >
-            {steps.slice(-6).map((s, i) => (
-              <div key={i}>{stepLabel(s)}</div>
-            ))}
-            {status === 'error' && steps.length === 0 && (
-              <div className="text-danger">{currentStep || 'Agent error.'}</div>
-            )}
-          </div>
+          <ActivityFeed steps={steps} status={status} currentStep={currentStep} />
         )}
       </div>
+
+      {/* Outside the scroll area on purpose: a consent prompt the user has to
+          go looking for is a consent prompt they will click through blind. It
+          sits directly above the composer, always in view. */}
+      <AllowAccess task={lastUserMessage} />
 
       <footer className="border-t border-line/25 p-3">
         {hasKey === false ? (
@@ -410,6 +401,81 @@ function ConnectKey({ model, onConnected }: { model: ModelId; onConnected: () =>
   );
 }
 
+// What the agent is doing, as one quiet line you can open. The raw tool calls
+// are still there — they're just not the default view, because a wall of
+// navigate({"url":…}) is noise to everyone except the person debugging it.
+function ActivityFeed({
+  steps,
+  status,
+  currentStep,
+}: {
+  steps: AgentStepEvent[];
+  status: 'idle' | 'running' | 'error';
+  currentStep: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const actions = steps.filter((s) => s.kind === 'tool_call');
+  const failed = status === 'error';
+  const summary = failed
+    ? currentStep || 'The task stopped.'
+    : (humanStep(steps[steps.length - 1]) ?? 'Working…');
+
+  return (
+    <div
+      className={`mb-5 overflow-hidden rounded-lg border text-[12px] ${
+        failed ? 'border-danger/30 bg-danger/5' : 'border-line/50 bg-surface-muted/30'
+      }`}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left"
+        aria-expanded={open}
+      >
+        {!failed && status === 'running' && (
+          <span className="activity-pulse h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+        )}
+        <span className={`flex-1 truncate ${failed ? 'text-danger' : 'text-ink-primary'}`}>
+          {summary}
+        </span>
+        {actions.length > 0 && (
+          <span className="shrink-0 text-[11px] text-ink-secondary">
+            {actions.length} {actions.length === 1 ? 'step' : 'steps'}
+          </span>
+        )}
+        <span className={`shrink-0 text-ink-secondary transition-transform ${open ? 'rotate-90' : ''}`}>
+          ›
+        </span>
+      </button>
+
+      {open && (
+        <div className="max-h-56 overflow-y-auto border-t border-line/40 px-3 py-2">
+          {steps.length === 0 ? (
+            <div className="text-ink-secondary">Nothing recorded yet.</div>
+          ) : (
+            <ol className="space-y-1.5">
+              {steps.map((s, i) => {
+                const line = humanStep(s);
+                if (!line) return null;
+                return (
+                  <li key={i} className={s.kind === 'error' ? 'text-danger' : 'text-ink-secondary'}>
+                    <div>{line}</div>
+                    {s.kind === 'tool_call' && s.detail && (
+                      <div className="mt-0.5 truncate font-mono text-[10.5px] text-ink-secondary/70">
+                        {s.detail}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // The once-per-task browsing consent, answered in the chat next to the task it
 // belongs to rather than in a modal over the page.
 function AllowAccess({ task }: { task: string }) {
@@ -423,7 +489,7 @@ function AllowAccess({ task }: { task: string }) {
   };
 
   return (
-    <div className="mb-6 rounded-xl border border-line/60 bg-surface-muted/40 p-4">
+    <div className="mx-3 mb-2 rounded-xl border border-primary/30 bg-primary/[0.04] p-4 shadow-sm">
       <div className="text-[13px] font-medium text-ink-primary">
         Allow Access
       </div>
@@ -509,19 +575,66 @@ function slashHelpText(): string {
   ].join('\n');
 }
 
-function stepLabel(step: AgentStepEvent): string {
+// Plain-English name for each browser action. The tool name and its raw
+// arguments are still shown underneath when the feed is expanded; this is the
+// line a person reads.
+const ACTION_VERB: Record<string, string> = {
+  navigate: 'Opening',
+  read_page: 'Reading the page',
+  getPageMetadata: 'Checking the page',
+  extract: 'Pulling data off the page',
+  listLinks: 'Looking at the links',
+  getSelection: 'Reading the selection',
+  click: 'Clicking',
+  type: 'Typing',
+  press_key: 'Pressing a key',
+  scroll: 'Scrolling',
+  wait_for: 'Waiting for the page',
+  screenshot: 'Taking a screenshot',
+  new_tab: 'Opening a new tab',
+  switch_tab: 'Switching tabs',
+  close_tab: 'Closing a tab',
+  list_tabs: 'Checking open tabs',
+  go_back: 'Going back',
+  go_forward: 'Going forward',
+  reload: 'Reloading',
+};
+
+// Pull the interesting argument out of the raw call so the summary can name
+// what it acted on ("Opening example.com") instead of just the verb.
+function describeTarget(step: AgentStepEvent): string {
+  if (step.kind !== 'tool_call') return '';
+  const input = step.input as Record<string, unknown> | undefined;
+  const url = typeof input?.url === 'string' ? input.url : '';
+  if (url) {
+    try {
+      return new URL(url).hostname.replace(/^www\./, '');
+    } catch {
+      return url;
+    }
+  }
+  const target = typeof input?.target === 'string' ? input.target : '';
+  return target ? `“${target}”` : '';
+}
+
+function humanStep(step: AgentStepEvent | undefined): string | null {
+  if (!step) return null;
   switch (step.kind) {
     case 'thinking':
-      return '· Thinking…';
-    case 'tool_call':
-      return `→ ${step.detail}`;
+      return 'Thinking…';
+    case 'tool_call': {
+      const verb = ACTION_VERB[step.toolName] ?? step.toolName;
+      const target = describeTarget(step);
+      return target ? `${verb} ${target}` : verb;
+    }
+    // Results and the final text are not their own line: the action already
+    // said what was happening, and the answer renders as a message.
     case 'tool_result':
-      return `  ✓ ${step.toolName}`;
-    case 'error':
-      return `! ${step.message}`;
-    case 'done':
-      return '· Done';
     case 'text':
-      return '';
+      return null;
+    case 'error':
+      return step.message;
+    case 'done':
+      return 'Done';
   }
 }

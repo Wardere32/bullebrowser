@@ -1,7 +1,7 @@
 // Tab manager. Owns one WebContentsView per tab, attaches them to the
 // main BaseWindow, and broadcasts state changes to the renderer.
 
-import { type BrowserWindow, Menu, MenuItem, WebContentsView, clipboard } from 'electron';
+import { app, type BrowserWindow, Menu, MenuItem, WebContentsView, clipboard } from 'electron';
 import { randomUUID } from 'node:crypto';
 import { IPC, type TabState, type LayoutBounds } from '../../shared/ipc.js';
 import { historyStore } from '../storage/history.js';
@@ -59,6 +59,9 @@ class TabManager {
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,
+        // Matches the app window: no DevTools on a shipped build. See the note
+        // in window.ts — this is tidiness, not secrecy.
+        devTools: !app.isPackaged,
       },
     });
     const tab: ManagedTab = {

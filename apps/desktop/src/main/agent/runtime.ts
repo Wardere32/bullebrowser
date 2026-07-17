@@ -62,7 +62,7 @@ export class DesktopToolRuntime implements ToolRuntime {
   async click(tabId: string, target: string) {
     const wc = this.wcFor(tabId);
     const matched = (await wc.executeJavaScript(
-      `${DEEP_QUERY}; (${CLICK_FN.toString()})(${JSON.stringify(target)})`,
+      `${DEEP_QUERY}; ${AGENT_CURSOR}; (${CLICK_FN.toString()})(${JSON.stringify(target)})`,
     )) as string;
     return { matched };
   }
@@ -70,7 +70,7 @@ export class DesktopToolRuntime implements ToolRuntime {
   async type(tabId: string, target: string, text: string) {
     const wc = this.wcFor(tabId);
     const matched = (await wc.executeJavaScript(
-      `${DEEP_QUERY}; (${TYPE_FN.toString()})(${JSON.stringify(target)}, ${JSON.stringify(text)})`,
+      `${DEEP_QUERY}; ${AGENT_CURSOR}; (${TYPE_FN.toString()})(${JSON.stringify(target)}, ${JSON.stringify(text)})`,
     )) as string;
     return { matched };
   }
@@ -402,7 +402,84 @@ const DEEP_QUERY = `
   };
 `;
 
-function CLICK_FN(target: string): string {
+// A visible pointer for the agent's actions. The agent clicks and types through
+// the DOM, which is invisible — the page just changes and the user has no idea
+// what happened or where. This paints a cursor at the element, pulses a ring
+// where the click lands, and briefly outlines the element it acted on, so the
+// user can follow along on their own screen.
+//
+// Everything lives in a shadow root under a single host element so it cannot
+// inherit or leak page CSS, is skipped by the agent's own readers (it is added
+// after read_page runs, and carries aria-hidden), and can be torn down by
+// removing one node.
+const AGENT_CURSOR = `
+  window.__bbCursor = function (el, opts) {
+    opts = opts || {};
+    try {
+      var HOST_ID = '__bb_agent_cursor__';
+      var host = document.getElementById(HOST_ID);
+      if (!host) {
+        host = document.createElement('div');
+        host.id = HOST_ID;
+        host.setAttribute('aria-hidden', 'true');
+        host.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;z-index:2147483647;pointer-events:none;';
+        (document.body || document.documentElement).appendChild(host);
+        var root = host.attachShadow({ mode: 'open' });
+        root.innerHTML =
+          '<style>' +
+          ':host{all:initial}' +
+          '.ptr{position:fixed;width:22px;height:22px;margin:-2px 0 0 -2px;' +
+            'transition:transform .35s cubic-bezier(.22,1,.36,1);will-change:transform;' +
+            'filter:drop-shadow(0 1px 3px rgba(0,0,0,.4))}' +
+          '.ring{position:fixed;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;' +
+            'border:2px solid #2563EB;opacity:0;pointer-events:none}' +
+          '.ring.go{animation:bb-ring .5s ease-out forwards}' +
+          '.halo{position:fixed;border:2px solid rgba(37,99,235,.9);border-radius:4px;' +
+            'box-shadow:0 0 0 3px rgba(37,99,235,.18);opacity:0;transition:opacity .2s}' +
+          '.halo.go{opacity:1}' +
+          '@keyframes bb-ring{0%{opacity:.9;transform:scale(.4)}100%{opacity:0;transform:scale(3.2)}}' +
+          '@media (prefers-reduced-motion:reduce){.ptr{transition:none}.ring.go{animation:none}}' +
+          '</style>' +
+          '<svg class="ptr" viewBox="0 0 24 24" fill="none">' +
+            '<path d="M5 3l14 8.5-6.2 1.4L9.8 19 5 3z" fill="#fff" stroke="#111" stroke-width="1.3" stroke-linejoin="round"/>' +
+          '</svg>' +
+          '<div class="ring"></div><div class="halo"></div>';
+      }
+      var root2 = host.shadowRoot;
+      var ptr = root2.querySelector('.ptr');
+      var ring = root2.querySelector('.ring');
+      var halo = root2.querySelector('.halo');
+
+      var r = el.getBoundingClientRect();
+      var x = r.left + r.width / 2;
+      var y = r.top + r.height / 2;
+
+      ptr.style.transform = 'translate(' + x + 'px,' + y + 'px)';
+      halo.style.left = r.left + 'px';
+      halo.style.top = r.top + 'px';
+      halo.style.width = r.width + 'px';
+      halo.style.height = r.height + 'px';
+      halo.classList.add('go');
+
+      if (opts.click) {
+        ring.style.left = x + 'px';
+        ring.style.top = y + 'px';
+        ring.classList.remove('go');
+        void ring.offsetWidth; // restart the animation
+        ring.classList.add('go');
+      }
+
+      clearTimeout(window.__bbCursorTimer);
+      window.__bbCursorTimer = setTimeout(function () {
+        halo.classList.remove('go');
+      }, 1400);
+    } catch (e) {
+      /* never let the overlay break the action it is illustrating */
+    }
+  };
+`;
+
+function CLICK_FN(target: string): Promise<string> {
   let el: Element | null = null;
   try {
     el = (window as unknown as { __bbDeepQuery(s: string): Element | null }).__bbDeepQuery(target);
@@ -430,9 +507,22 @@ function CLICK_FN(target: string): string {
       null;
   }
   if (!el) throw new Error(`No element matched: ${target}`);
-  (el as HTMLElement).scrollIntoView({ block: 'center' });
-  (el as HTMLElement).click();
-  return (el as HTMLElement).outerHTML.slice(0, 200);
+  const node = el as HTMLElement;
+  node.scrollIntoView({ block: 'center' });
+  // Paint the cursor first, then dwell briefly before actually clicking.
+  // Without the pause the click fires in the same frame the cursor appears, so
+  // the page changes before the user's eye has anywhere to land — the whole
+  // point is to show them where it went.
+  const cursor = (window as unknown as {
+    __bbCursor(e: Element, o?: { click?: boolean }): void;
+  }).__bbCursor;
+  cursor(node, { click: true });
+  return new Promise<string>((resolve) => {
+    setTimeout(() => {
+      node.click();
+      resolve(node.outerHTML.slice(0, 200));
+    }, 320);
+  });
 }
 
 function TYPE_FN(target: string, text: string): string {
@@ -480,6 +570,8 @@ function TYPE_FN(target: string, text: string): string {
   }
   if (!el) throw new Error(`No input matched: ${target}`);
   const html = el as HTMLElement;
+  html.scrollIntoView({ block: 'center' });
+  (window as unknown as { __bbCursor(e: Element, o?: { click?: boolean }): void }).__bbCursor(html);
   html.focus();
   const isCE = html.isContentEditable;
   if (isCE) {
