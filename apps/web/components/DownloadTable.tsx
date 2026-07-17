@@ -11,7 +11,6 @@ import {
 } from '@/lib/releases';
 
 const PLATFORMS: { key: Platform; label: string; req: string }[] = [
-  { key: 'mac-universal', label: 'macOS · Universal (.dmg)', req: 'macOS 12 or newer' },
   { key: 'mac-arm64', label: 'macOS · Apple Silicon (.dmg)', req: 'macOS 12 or newer' },
   { key: 'mac-x64', label: 'macOS · Intel (.dmg)', req: 'macOS 12 or newer' },
   { key: 'win-x64', label: 'Windows 10/11 · x64 (.exe)', req: 'Windows 10 or newer' },

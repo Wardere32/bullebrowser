@@ -18,7 +18,6 @@ import {
 } from '@/lib/releases';
 
 const LABEL: Record<Platform, string> = {
-  'mac-universal': 'Download for macOS · Universal',
   'mac-arm64': 'Download for macOS · Apple Silicon',
   'mac-x64': 'Download for macOS · Intel',
   'win-x64': 'Download for Windows',
@@ -41,14 +40,11 @@ export function DownloadButton({ size = 'lg' }: { size?: 'lg' | 'md' }) {
       .finally(() => setLoaded(true));
   }, []);
 
-  const effectivePlatform: Platform =
-    platformFamily(platform) === 'mac' && dl?.forPlatform?.['mac-universal']
-      ? 'mac-universal'
-      : platform;
-
-  const primary = dl?.forPlatform?.[effectivePlatform];
+  const primary = dl?.forPlatform?.[platform];
+  // On a Mac, offer the other architecture as a secondary link — there is no
+  // universal build to fall back to.
   const macAlt =
-    platformFamily(platform) === 'mac' && effectivePlatform !== 'mac-universal'
+    platformFamily(platform) === 'mac'
       ? dl?.forPlatform?.[platform === 'mac-arm64' ? 'mac-x64' : 'mac-arm64']
       : undefined;
 
@@ -75,7 +71,7 @@ export function DownloadButton({ size = 'lg' }: { size?: 'lg' | 'md' }) {
     return (
       <div className="flex flex-col items-start gap-1.5">
         <a href={primary.browserDownloadUrl} className={cls} target="_blank" rel="noopener noreferrer">
-          {LABEL[effectivePlatform]}
+          {LABEL[platform]}
         </a>
         <div className="text-xs text-ink-secondary">
           {primary.tag} · {formatBytes(primary.size)}

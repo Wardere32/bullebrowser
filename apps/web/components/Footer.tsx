@@ -8,11 +8,13 @@ export function Footer() {
     <footer className="border-t border-line bg-surface-muted">
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10 md:flex-row md:items-start md:justify-between">
         <div className="flex flex-col gap-2">
+          {/* Same 36px as the header — the mark should read at one consistent
+              size wherever it appears in the page chrome. */}
           <img
             src={asset('/wordmark.png')}
             alt={product.name}
-            height={40}
-            className="h-10 w-auto select-none"
+            height={36}
+            className="h-9 w-auto select-none"
             draggable={false}
           />
           <p className="max-w-xs text-sm text-ink-secondary">{product.tagline}.</p>

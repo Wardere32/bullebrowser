@@ -6,7 +6,6 @@
 import { basePath } from '@/lib/asset';
 
 export type Platform =
-  | 'mac-universal'
   | 'mac-arm64'
   | 'mac-x64'
   | 'win-x64'
@@ -87,7 +86,8 @@ function semverGte(tag: string, minimum: string): boolean {
 function classify(name: string): Platform | null {
   const n = name.toLowerCase();
   if (n.endsWith('.dmg') || n.endsWith('.zip')) {
-    if (n.includes('universal')) return 'mac-universal';
+    // The mac build targets arm64 and x64 only (see electron-builder.yml), so
+    // there is no universal artifact to classify.
     return n.includes('arm64') ? 'mac-arm64' : 'mac-x64';
   }
   if (n.endsWith('.exe')) return n.includes('arm64') ? 'win-arm64' : 'win-x64';
