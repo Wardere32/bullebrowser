@@ -289,7 +289,7 @@ describe('runAgent Claude tool-use loop', () => {
     });
   });
 
-  it('surfaces a real error (does not fake an answer) when no API key is set', async () => {
+  it('surfaces a real error (does not fake an answer) when no key is set', async () => {
     await expect(
       runAgent({
         model: DEFAULT_MODEL,
@@ -299,7 +299,21 @@ describe('runAgent Claude tool-use loop', () => {
         context: makeContext(),
         onStep: () => {},
       }),
-    ).rejects.toThrow(/API key/);
+    ).rejects.toThrow(/Anthropic key/);
     expect(createMock).not.toHaveBeenCalled();
+  });
+
+  // Naming the wrong vendor's key sends the user to the wrong dashboard.
+  it('names the provider whose key is missing', async () => {
+    await expect(
+      runAgent({
+        model: 'gpt-4o',
+        systemPrompt: 'x',
+        history: [],
+        userMessage: 'hello',
+        context: makeContext(),
+        onStep: () => {},
+      }),
+    ).rejects.toThrow(/OpenAI key/);
   });
 });

@@ -2,7 +2,7 @@
 // surface. Both the preload script and the renderer consume this so we
 // never duplicate string literals across processes.
 
-import type { ClaudeModelId } from '@bullebrowser/agent-core';
+import type { ModelId, ProviderId } from '@bullebrowser/agent-core';
 import type { AgentStepEvent } from './agent-events.js';
 
 export const IPC = {
@@ -79,7 +79,7 @@ export interface LayoutBounds {
 }
 
 export interface AppSettings {
-  defaultModel: ClaudeModelId;
+  defaultModel: ModelId;
   aiPanelOpen: boolean;
   searchProvider: 'bullebrowser' | 'google' | 'bing';
   homepageUrl: string;
@@ -126,7 +126,7 @@ export interface ConversationDetail extends ConversationSummary {
 export interface AgentRunRequest {
   conversationId: string;
   userMessage: string;
-  model: ClaudeModelId;
+  model: ModelId;
   skillId?: string;
 }
 
@@ -170,9 +170,9 @@ export interface BrowserBridge {
     set(patch: Partial<AppSettings>): Promise<AppSettings>;
   };
   secrets: {
-    hasApiKey(): Promise<boolean>;
-    setApiKey(key: string): Promise<void>;
-    clearApiKey(): Promise<void>;
+    hasApiKey(provider?: ProviderId): Promise<boolean>;
+    setApiKey(key: string, provider?: ProviderId): Promise<void>;
+    clearApiKey(provider?: ProviderId): Promise<void>;
   };
   conversations: {
     list(): Promise<ConversationSummary[]>;

@@ -45,9 +45,9 @@ const bridge: BrowserBridge = {
     set: (patch: Partial<AppSettings>) => ipcRenderer.invoke(IPC.SETTINGS_SET, patch),
   },
   secrets: {
-    hasApiKey: () => ipcRenderer.invoke(IPC.SECRET_HAS_API_KEY),
-    setApiKey: (k) => ipcRenderer.invoke(IPC.SECRET_SET_API_KEY, k),
-    clearApiKey: () => ipcRenderer.invoke(IPC.SECRET_CLEAR_API_KEY),
+    hasApiKey: (p) => ipcRenderer.invoke(IPC.SECRET_HAS_API_KEY, p),
+    setApiKey: (k, p) => ipcRenderer.invoke(IPC.SECRET_SET_API_KEY, k, p),
+    clearApiKey: (p) => ipcRenderer.invoke(IPC.SECRET_CLEAR_API_KEY, p),
   },
   conversations: {
     list: () => ipcRenderer.invoke(IPC.CONVERSATION_LIST),

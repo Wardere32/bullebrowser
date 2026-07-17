@@ -1,15 +1,11 @@
 import { useEffect, useState } from 'react';
-import type { ClaudeModelId } from '@bullebrowser/agent-core';
+import { ASSISTANTS, providerFor, type ModelId } from '@bullebrowser/agent-core';
 import { useBrowserStore } from '../state/browser-store.js';
 import { useInputActivity } from '../hooks/useInputActivity.js';
 import type { AppSettings } from '../../shared/ipc.js';
 import { Modal } from './Modal.js';
 
-const MODELS: { id: ClaudeModelId; label: string }[] = [
-  { id: 'claude-opus-4-7', label: 'BulleBrowser Pro' },
-  { id: 'claude-sonnet-4-6', label: 'BulleBrowser Balanced' },
-  { id: 'claude-haiku-4-5-20251001', label: 'BulleBrowser Fastest' },
-];
+const MODELS = ASSISTANTS;
 
 export function SettingsModal() {
   const closeSettings = useBrowserStore((s) => s.closeSettings);
@@ -25,8 +21,9 @@ export function SettingsModal() {
 
   useEffect(() => {
     void (async () => {
-      setSettings(await window.bullebrowser.settings.get());
-      setHasKey(await window.bullebrowser.secrets.hasApiKey());
+      const next = await window.bullebrowser.settings.get();
+      setSettings(next);
+      setHasKey(await window.bullebrowser.secrets.hasApiKey(providerFor(next.defaultModel)));
     })();
   }, []);
 
@@ -41,18 +38,28 @@ export function SettingsModal() {
   const update = async (patch: Partial<AppSettings>) => {
     const next = await window.bullebrowser.settings.set(patch);
     setSettings(next);
+    if (patch.defaultModel) {
+      setHasKey(await window.bullebrowser.secrets.hasApiKey(providerFor(next.defaultModel)));
+    }
     if (next.searchProvider) {
       setSearchProvider(next.searchProvider);
     }
     setSavedAt(Date.now());
   };
 
+  // Everything below keys off the assistant currently chosen, so switching to
+  // ChatGPT asks for an OpenAI key rather than reporting the Anthropic one as
+  // "saved" and then 401ing on the first message.
+  const provider = providerFor(settings.defaultModel);
+  const assistantLabel = MODELS.find((m) => m.id === settings.defaultModel)?.label ?? 'Assistant';
+  const keyPlaceholder = provider === 'openai' ? 'sk-…' : 'sk-ant-…';
+
   const saveKey = async () => {
     if (!keyDraft.trim()) return;
     setSaving(true);
     setKeyError(null);
     try {
-      await window.bullebrowser.secrets.setApiKey(keyDraft.trim());
+      await window.bullebrowser.secrets.setApiKey(keyDraft.trim(), provider);
       setHasKey(true);
       setKeyDraft('');
       setSavedAt(Date.now());
@@ -64,7 +71,7 @@ export function SettingsModal() {
   };
 
   const clearKey = async () => {
-    await window.bullebrowser.secrets.clearApiKey();
+    await window.bullebrowser.secrets.clearApiKey(provider);
     setHasKey(false);
     setSavedAt(Date.now());
   };
@@ -74,11 +81,11 @@ export function SettingsModal() {
       <section className="space-y-4">
         <div>
           <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-secondary">
-            BulleBrowser AI key (optional)
+            {assistantLabel} key
           </h3>
           <p className="mt-1 text-xs text-ink-secondary">
-            Stored encrypted in your OS keychain. Used only to call the
-            configured AI provider directly from this device when you choose to use one.
+            Encrypted and stored on this device only — no keychain prompt. Used
+            only to call {assistantLabel} directly from your machine.
           </p>
           {hasKey ? (
             <div className="mt-2 flex items-center gap-2">
@@ -111,7 +118,7 @@ export function SettingsModal() {
                     onPaste={() => apiKeyActivity.onInputActivity()}
                     onFocus={apiKeyActivity.onFocus}
                     onBlur={apiKeyActivity.onBlur}
-                    placeholder="sk-ant-…"
+                    placeholder={keyPlaceholder}
                     className="prompt-input-field prompt-input-field--singleline"
                     disabled={saving}
                   />
@@ -134,11 +141,11 @@ export function SettingsModal() {
 
         <div>
           <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-secondary">
-            External model preset
+            Assistant
           </h3>
           <select
             value={settings.defaultModel}
-            onChange={(e) => update({ defaultModel: e.target.value as ClaudeModelId })}
+            onChange={(e) => update({ defaultModel: e.target.value as ModelId })}
             className="mt-2 rounded border border-line px-2 py-1.5 text-sm"
           >
             {MODELS.map((m) => (

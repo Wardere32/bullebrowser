@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { skills } from '@bullebrowser/agent-core';
-import type { ClaudeModelId } from '@bullebrowser/agent-core';
+import { skills, ASSISTANTS, providerFor, type ModelId } from '@bullebrowser/agent-core';
 import { useAgentStore } from '../state/agent-store.js';
 import { AGENT_PROMPT_EVENT } from '../lib/url.js';
 import { expandSlashCommand, SLASH_COMMANDS } from '../lib/slash-commands.js';
@@ -16,11 +15,7 @@ function browserBridge(): any {
   return (window as unknown as { bullebrowser: any }).bullebrowser;
 }
 
-const MODELS: { id: ClaudeModelId; label: string }[] = [
-  { id: 'claude-opus-4-7', label: 'BulleBrowser Pro (most capable)' },
-  { id: 'claude-sonnet-4-6', label: 'BulleBrowser Balanced' },
-  { id: 'claude-haiku-4-5-20251001', label: 'BulleBrowser Fastest' },
-];
+const MODELS = ASSISTANTS;
 
 export function AiPanel() {
   const current = useAgentStore((s) => s.current);
@@ -33,7 +28,7 @@ export function AiPanel() {
   const runId = useAgentStore((s) => s.runId);
   const [draft, setDraft] = useState('');
   const [skillId, setSkillId] = useState<string>('');
-  const [model, setModel] = useState<ClaudeModelId>('claude-opus-4-7');
+  const [model, setModel] = useState<ModelId>('claude-opus-4-7');
   // null = not checked yet, so we render neither the chat nor the connect
   // form until we know, instead of flashing the wrong one.
   const [hasKey, setHasKey] = useState<boolean | null>(null);
@@ -44,9 +39,9 @@ export function AiPanel() {
   useEffect(() => {
     void (async () => {
       const bridge = browserBridge();
-      setHasKey(await bridge.secrets.hasApiKey());
       const settings: AppSettings = await bridge.settings.get();
       setModel(settings.defaultModel);
+      setHasKey(await bridge.secrets.hasApiKey(providerFor(settings.defaultModel)));
       const list = await bridge.conversations.list();
       setConversations(list);
       if (list.length === 0) {
@@ -155,6 +150,15 @@ export function AiPanel() {
     textareaRef.current?.focus();
   }, [current, status]);
 
+  // Each assistant authenticates with its own provider's key, so switching
+  // between Claude and ChatGPT has to re-check — otherwise picking ChatGPT with
+  // only an Anthropic key saved would show a working chat that 401s on send.
+  useEffect(() => {
+    void browserBridge()
+      .secrets.hasApiKey(providerFor(model))
+      .then((present: boolean) => setHasKey(present));
+  }, [model]);
+
   // The task the "Allow Access" prompt is asking about — always the message
   // that kicked off the current run.
   const lastUserMessage =
@@ -168,9 +172,9 @@ export function AiPanel() {
     if (status !== 'error') return;
     if (!/api key|401|Settings and paste/i.test(currentStep)) return;
     void browserBridge()
-      .secrets.hasApiKey()
+      .secrets.hasApiKey(providerFor(model))
       .then((present: boolean) => setHasKey(present));
-  }, [status, currentStep]);
+  }, [status, currentStep, model]);
 
   const createConversation = async () => {
     const bridge = browserBridge();
@@ -209,7 +213,7 @@ export function AiPanel() {
         </select>
         <select
           value={model}
-          onChange={(e) => setModel(e.target.value as ClaudeModelId)}
+          onChange={(e) => setModel(e.target.value as ModelId)}
           className="rounded-md bg-transparent py-1 text-ink-secondary transition-colors hover:text-ink-primary focus:outline-none"
         >
           {MODELS.map((m) => (
@@ -221,7 +225,7 @@ export function AiPanel() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-5">
-        {hasKey === false && <ConnectKey onConnected={() => setHasKey(true)} />}
+        {hasKey === false && <ConnectKey model={model} onConnected={() => setHasKey(true)} />}
         {hasKey === true && current && current.messages.length === 0 && (
           <EmptyState />
         )}
@@ -348,7 +352,10 @@ export function AiPanel() {
 // rather than sitting beside it — the previous behaviour surfaced the failure
 // as one line of small red text in the step feed, which read as "the chat is
 // just broken".
-function ConnectKey({ onConnected }: { onConnected: () => void }) {
+function ConnectKey({ model, onConnected }: { model: ModelId; onConnected: () => void }) {
+  const assistant = ASSISTANTS.find((a) => a.id === model);
+  const provider = providerFor(model);
+  const hint = provider === 'openai' ? 'sk-…' : 'sk-ant-…';
   const [key, setKey] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -358,7 +365,7 @@ function ConnectKey({ onConnected }: { onConnected: () => void }) {
     setBusy(true);
     setError('');
     try {
-      await browserBridge().secrets.setApiKey(key.trim());
+      await browserBridge().secrets.setApiKey(key.trim(), provider);
       setKey('');
       onConnected();
     } catch (e) {
@@ -371,12 +378,12 @@ function ConnectKey({ onConnected }: { onConnected: () => void }) {
   return (
     <div className="space-y-4 pt-2 text-sm">
       <p className="text-[15px] font-semibold tracking-tight text-ink-primary">
-        Connect BulleBrowser AI
+        Connect {assistant?.label ?? 'your assistant'}
       </p>
       <p className="leading-relaxed text-ink-secondary">
-        BulleBrowser needs your key before it can browse or answer. It&apos;s
-        stored encrypted in your Mac&apos;s keychain and never leaves this
-        device.
+        BulleBrowser needs your {assistant?.label ?? ''} key before it can browse
+        or answer. It&apos;s encrypted and stored on this device only — no
+        keychain prompt, and it never leaves your machine.
       </p>
       <input
         type="password"
@@ -385,7 +392,7 @@ function ConnectKey({ onConnected }: { onConnected: () => void }) {
         onKeyDown={(e) => {
           if (e.key === 'Enter') void connect();
         }}
-        placeholder="sk-ant-…"
+        placeholder={hint}
         autoComplete="off"
         spellCheck={false}
         className="w-full rounded-md border border-line px-3 py-2 font-mono text-xs focus:border-primary focus:outline-none"

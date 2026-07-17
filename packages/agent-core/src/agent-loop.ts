@@ -17,16 +17,23 @@ import { PrivacyPolicyEngine } from './policy.js';
 import { retrieveContext } from './retrieval.js';
 import { getTool, zodToJsonSchema } from './tools/index.js';
 import {
+  createOpenAiCompletion,
+  parseToolArguments,
+  toOpenAiTools,
+  type OpenAiMessage,
+} from './openai-loop.js';
+import {
   MAX_TOOL_CALLS_PER_TASK,
+  providerFor,
   type AgentInput,
   type AgentStepHandler,
-  type ClaudeModelId,
+  type ModelId,
   type PlanStep,
   type ToolContext,
   type ToolName,
 } from './types.js';
 
-export const DEFAULT_MODEL: ClaudeModelId = 'claude-opus-4-7';
+export const DEFAULT_MODEL: ModelId = 'claude-opus-4-7';
 
 // Max tokens for each model turn. Well under the SDK's non-streaming HTTP
 // timeout while leaving room for a substantial final report.
@@ -115,18 +122,31 @@ function previewOutput(output: unknown): unknown {
   return output;
 }
 
-async function runToolCall(
-  toolUse: Anthropic.ToolUseBlock,
+// Provider-neutral result of running one tool. Both the Claude and the ChatGPT
+// loop go through executeToolCall and then adapt this to their own wire format,
+// so the consent gate, the policy checks and the step reporting exist once
+// rather than once per provider.
+export interface ToolCallOutcome {
+  text: string;
+  isError: boolean;
+  /** Base64 PNG, set only for a successful screenshot. */
+  imagePngBase64?: string;
+}
+
+export async function executeToolCall(
+  callId: string,
+  rawName: string,
+  rawInput: unknown,
   context: ToolContext,
   policy: PrivacyPolicyEngine,
   onStep: AgentStepHandler,
   gate: BrowseGate,
-): Promise<Anthropic.ToolResultBlockParam> {
-  const name = toolUse.name as ToolName;
-  const input = (toolUse.input ?? {}) as Record<string, unknown>;
-  const fail = (detail: string): Anthropic.ToolResultBlockParam => {
+): Promise<ToolCallOutcome> {
+  const name = rawName as ToolName;
+  const input = (rawInput ?? {}) as Record<string, unknown>;
+  const fail = (detail: string): ToolCallOutcome => {
     onStep({ type: 'error', toolName: name, detail });
-    return { type: 'tool_result', tool_use_id: toolUse.id, content: detail, is_error: true };
+    return { text: detail, isError: true };
   };
 
   onStep({
@@ -150,7 +170,7 @@ async function runToolCall(
 
   // Privacy / safety policy: block sensitive actions outright, and require an
   // explicit user confirmation for destructive ones (submit, purchase, delete…).
-  const step: PlanStep = { id: toolUse.id, toolName: name, input, expected: '' };
+  const step: PlanStep = { id: callId, toolName: name, input, expected: '' };
   const decision = policy.evaluateToolStep(step);
   if (!decision.allowed) return fail(decision.reason ?? 'Blocked by policy.');
   if (decision.requiresConfirmation) {
@@ -165,37 +185,45 @@ async function runToolCall(
     const output = await tool.execute(parsed, context);
     onStep({ type: 'tool_result', toolName: name, data: policy.redact(previewOutput(output)) });
 
-    // Return the screenshot as an image block so the model can actually see the
-    // page, rather than dumping a giant base64 string into a text result.
-    if (
-      name === 'screenshot' &&
-      output &&
-      typeof output === 'object' &&
-      'pngBase64' in output
-    ) {
-      return {
-        type: 'tool_result',
-        tool_use_id: toolUse.id,
-        content: [
-          {
-            type: 'image',
-            source: {
-              type: 'base64',
-              media_type: 'image/png',
-              data: (output as { pngBase64: string }).pngBase64,
-            },
-          },
-        ],
-      };
+    // Hand a screenshot back as a real image so the model can see the page,
+    // rather than dumping a giant base64 string into a text result.
+    if (name === 'screenshot' && output && typeof output === 'object' && 'pngBase64' in output) {
+      const png = (output as { pngBase64: string }).pngBase64;
+      if (png) return { text: 'Screenshot captured.', isError: false, imagePngBase64: png };
+      return fail('The screenshot came back empty.');
     }
 
-    // The Anthropic Messages API requires tool_result.content to be a string or
-    // an array of content blocks — never a raw object. Stringify.
     const text = typeof output === 'string' ? output : JSON.stringify(output);
-    return { type: 'tool_result', tool_use_id: toolUse.id, content: truncate(text, 100_000) };
+    return { text: truncate(text, 100_000), isError: false };
   } catch (error) {
     return fail(error instanceof Error ? error.message : 'Tool execution failed.');
   }
+}
+
+// Adapt a neutral outcome to Anthropic's tool_result. The Messages API requires
+// content to be a string or an array of content blocks — never a raw object.
+function toAnthropicToolResult(
+  id: string,
+  outcome: ToolCallOutcome,
+): Anthropic.ToolResultBlockParam {
+  if (outcome.imagePngBase64) {
+    return {
+      type: 'tool_result',
+      tool_use_id: id,
+      content: [
+        {
+          type: 'image',
+          source: { type: 'base64', media_type: 'image/png', data: outcome.imagePngBase64 },
+        },
+      ],
+    };
+  }
+  return {
+    type: 'tool_result',
+    tool_use_id: id,
+    content: outcome.text,
+    ...(outcome.isError ? { is_error: true } : {}),
+  };
 }
 
 // Asks for browsing access at most once per run and remembers the answer, so
@@ -224,13 +252,18 @@ export async function runAgent(input: AgentInput): Promise<string> {
     throw new Error('cancelled');
   }
 
+  const provider = providerFor(input.model);
+
   if (!input.apiKey) {
     // Throw rather than return a canned string — otherwise the "answer" renders
     // as a normal assistant message and the failure is invisible. Throwing routes
     // it through the run's error channel so the chat shows a real error.
     throw new Error(
-      'No Anthropic API key is configured. Open Settings and paste your key ' +
-        '(it is stored encrypted in your OS keychain) to enable the agent.',
+      provider === 'openai'
+        ? 'ChatGPT needs an OpenAI key. Open Settings, choose ChatGPT, and paste ' +
+          'a key that starts with "sk-" — or switch the assistant back to Claude.'
+        : 'Claude needs an Anthropic key. Open Settings and paste a key that ' +
+          'starts with "sk-ant-" to enable the agent.',
     );
   }
 
@@ -253,9 +286,13 @@ export async function runAgent(input: AgentInput): Promise<string> {
     : '\n\nCurrent browser context: no page is loaded yet. Use `navigate` (for ' +
       'example to a search engine) to begin.';
   const system = `${input.systemPrompt}${contextNote}`;
+  const toolDefs = buildToolDefs();
+
+  if (provider === 'openai') {
+    return runOpenAiTurns({ input, system, toolDefs, policy, gate });
+  }
 
   const client = new Anthropic({ apiKey: input.apiKey });
-  const toolDefs = buildToolDefs();
 
   // Adaptive thinking lets the model reason between tool calls, which markedly
   // improves multi-step browsing. Supported on the Opus/Sonnet tiers but not on
@@ -339,16 +376,132 @@ export async function runAgent(input: AgentInput): Promise<string> {
         continue;
       }
       toolCalls += 1;
-      toolResults.push(await runToolCall(toolUse, context, policy, onStep, gate));
+      const outcome = await executeToolCall(
+        toolUse.id,
+        toolUse.name,
+        toolUse.input,
+        context,
+        policy,
+        onStep,
+        gate,
+      );
+      toolResults.push(toAnthropicToolResult(toolUse.id, outcome));
     }
 
     messages.push({ role: 'user', content: toolResults });
   }
 
   onStep({ type: 'done' });
-  return (
-    finalText ||
-    'I was unable to produce a final answer within the tool-call limit. ' +
-      'Please refine the task or ask me to continue.'
+  return finalText || NO_ANSWER;
+}
+
+const NO_ANSWER =
+  'I was unable to produce a final answer within the tool-call limit. ' +
+  'Please refine the task or ask me to continue.';
+
+// The ChatGPT loop. Deliberately mirrors the Claude loop above turn for turn —
+// same tools, same consent gate, same policy, same limits — differing only where
+// the wire format forces it.
+async function runOpenAiTurns(args: {
+  input: AgentInput;
+  system: string;
+  toolDefs: Anthropic.Tool[];
+  policy: PrivacyPolicyEngine;
+  gate: BrowseGate;
+}): Promise<string> {
+  const { input, system, toolDefs, policy, gate } = args;
+  const { context, onStep } = input;
+
+  const tools = toOpenAiTools(
+    toolDefs.map((d) => ({
+      name: d.name,
+      description: d.description ?? '',
+      input_schema: d.input_schema as unknown as Record<string, unknown>,
+    })),
   );
+
+  const messages: OpenAiMessage[] = [
+    { role: 'system', content: system },
+    ...input.history.map((m) => ({ role: m.role, content: m.content }) as OpenAiMessage),
+    { role: 'user', content: input.userMessage },
+  ];
+
+  let finalText = '';
+  let toolCalls = 0;
+
+  for (let turn = 0; turn < MAX_TOOL_CALLS_PER_TASK + 5; turn++) {
+    if (context.signal.aborted) throw new Error('cancelled');
+    onStep({ type: 'thinking', detail: 'Thinking…' });
+
+    const response = await createOpenAiCompletion(
+      input.apiKey as string,
+      { model: input.model, messages, tools, tool_choice: 'auto', max_tokens: MAX_TOKENS_PER_TURN },
+      context.signal,
+    );
+
+    const choice = response.choices?.[0];
+    if (!choice) throw new Error('OpenAI returned no choices.');
+    const turnText = (choice.message.content ?? '').trim();
+    if (turnText) onStep({ type: 'text', detail: turnText });
+
+    const calls = choice.message.tool_calls ?? [];
+    if (calls.length === 0) {
+      finalText = finalText ? `${finalText} ${turnText}`.trim() : turnText;
+      break;
+    }
+
+    // Echo the assistant turn back verbatim; OpenAI requires the tool_calls it
+    // issued to be present before their results.
+    messages.push({ role: 'assistant', content: choice.message.content ?? '', tool_calls: calls });
+
+    // Every tool_call must get a matching 'tool' message or the next request is
+    // rejected — so this loop must not skip any call, even past the limit.
+    const images: string[] = [];
+    for (const call of calls) {
+      if (context.signal.aborted) throw new Error('cancelled');
+      if (toolCalls >= MAX_TOOL_CALLS_PER_TASK) {
+        messages.push({
+          role: 'tool',
+          tool_call_id: call.id,
+          content: `Tool-call limit (${MAX_TOOL_CALLS_PER_TASK}) reached. Summarize what you have and stop.`,
+        });
+        continue;
+      }
+      toolCalls += 1;
+
+      const { name, input: parsedInput, error } = parseToolArguments(call);
+      if (error) {
+        onStep({ type: 'error', toolName: name, detail: error });
+        messages.push({ role: 'tool', tool_call_id: call.id, content: error });
+        continue;
+      }
+
+      const outcome = await executeToolCall(
+        call.id,
+        name,
+        parsedInput,
+        context,
+        policy,
+        onStep,
+        gate,
+      );
+      messages.push({ role: 'tool', tool_call_id: call.id, content: outcome.text });
+      // There is no image tool_result in this API, so a screenshot follows as a
+      // user message once all the tool replies are in.
+      if (outcome.imagePngBase64) images.push(outcome.imagePngBase64);
+    }
+
+    for (const png of images) {
+      messages.push({
+        role: 'user',
+        content: [
+          { type: 'text', text: 'Here is the screenshot you requested.' },
+          { type: 'image_url', image_url: { url: `data:image/png;base64,${png}` } },
+        ],
+      });
+    }
+  }
+
+  onStep({ type: 'done' });
+  return finalText || NO_ANSWER;
 }

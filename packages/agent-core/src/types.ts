@@ -1,9 +1,28 @@
 import type { z } from 'zod';
 
+export type ProviderId = 'anthropic' | 'openai';
+
 export type ClaudeModelId =
   | 'claude-opus-4-7'
   | 'claude-sonnet-4-6'
   | 'claude-haiku-4-5-20251001';
+
+export type OpenAiModelId = 'gpt-4o' | 'gpt-4o-mini';
+
+export type ModelId = ClaudeModelId | OpenAiModelId;
+
+export function providerFor(model: ModelId): ProviderId {
+  return model.startsWith('claude') ? 'anthropic' : 'openai';
+}
+
+// The two choices the user actually picks between. Each is a named assistant
+// backed by that vendor's strongest model for tool-driven browsing; the exact
+// model id stays an implementation detail so it can be upgraded without the
+// user's saved preference pointing at a retired model.
+export const ASSISTANTS: { id: ModelId; label: string; provider: ProviderId }[] = [
+  { id: 'claude-opus-4-7', label: 'Claude', provider: 'anthropic' },
+  { id: 'gpt-4o', label: 'ChatGPT', provider: 'openai' },
+];
 
 export type ToolName =
   | 'getActiveTab'
@@ -109,7 +128,7 @@ export type AgentStepHandler = (step: AgentStep) => void;
 
 export interface AgentInput {
   apiKey?: string;
-  model: ClaudeModelId;
+  model: ModelId;
   systemPrompt: string;
   history: { role: 'user' | 'assistant'; content: string }[];
   userMessage: string;

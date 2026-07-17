@@ -62,7 +62,7 @@ export class DesktopToolRuntime implements ToolRuntime {
   async click(tabId: string, target: string) {
     const wc = this.wcFor(tabId);
     const matched = (await wc.executeJavaScript(
-      `(${CLICK_FN.toString()})(${JSON.stringify(target)})`,
+      `${DEEP_QUERY}; (${CLICK_FN.toString()})(${JSON.stringify(target)})`,
     )) as string;
     return { matched };
   }
@@ -70,7 +70,7 @@ export class DesktopToolRuntime implements ToolRuntime {
   async type(tabId: string, target: string, text: string) {
     const wc = this.wcFor(tabId);
     const matched = (await wc.executeJavaScript(
-      `(${TYPE_FN.toString()})(${JSON.stringify(target)}, ${JSON.stringify(text)})`,
+      `${DEEP_QUERY}; (${TYPE_FN.toString()})(${JSON.stringify(target)}, ${JSON.stringify(text)})`,
     )) as string;
     return { matched };
   }
@@ -373,21 +373,60 @@ function QUERY_DOM_FN(selector: string): number {
   }
 }
 
+// Walk the whole element tree including shadow roots. document.querySelector
+// does not pierce shadow DOM, so on any web-component site (YouTube's ytd-*,
+// Salesforce Lightning, most modern design systems) every click and type used
+// to fail with "No element matched" even though the control was right there.
+// Injected alongside CLICK_FN/TYPE_FN, which call it.
+// Assigned onto window so the injected CLICK_FN/TYPE_FN bodies can reach them
+// regardless of how the evaluated string is scoped.
+const DEEP_QUERY = `
+  window.__bbDeepAll = function (selector) {
+    const out = [];
+    const walk = (node) => {
+      if (!node) return;
+      let found;
+      try { found = node.querySelectorAll(selector); } catch (e) { return; }
+      for (const el of found) out.push(el);
+      // Recurse into every shadow root on this level.
+      let hosts;
+      try { hosts = node.querySelectorAll('*'); } catch (e) { return; }
+      for (const el of hosts) if (el.shadowRoot) walk(el.shadowRoot);
+    };
+    walk(document);
+    return out;
+  };
+  window.__bbDeepQuery = function (selector) {
+    const all = window.__bbDeepAll(selector);
+    return all.length ? all[0] : null;
+  };
+`;
+
 function CLICK_FN(target: string): string {
   let el: Element | null = null;
   try {
-    el = document.querySelector(target);
+    el = (window as unknown as { __bbDeepQuery(s: string): Element | null }).__bbDeepQuery(target);
   } catch {
     /* not a selector */
   }
   if (!el) {
     const tl = target.toLowerCase();
-    const candidates = Array.from(
-      document.querySelectorAll('a, button, [role="button"], input[type="submit"]'),
+    const deepAll = (window as unknown as { __bbDeepAll(s: string): Element[] }).__bbDeepAll;
+    const candidates = deepAll(
+      'a, button, [role="button"], input[type="submit"], input[type="button"], summary',
     );
+    const visible = candidates.filter((n) => {
+      const r = n.getBoundingClientRect();
+      return r.width > 0 || r.height > 0;
+    });
+    const pool = visible.length ? visible : candidates;
+    const label = (n: Element) =>
+      ((n as HTMLElement).innerText || n.getAttribute('aria-label') || (n as HTMLInputElement).value || '')
+        .trim()
+        .toLowerCase();
     el =
-      candidates.find((n) => (n as HTMLElement).innerText?.trim().toLowerCase() === tl) ??
-      candidates.find((n) => (n as HTMLElement).innerText?.toLowerCase().includes(tl)) ??
+      pool.find((n) => label(n) === tl) ??
+      pool.find((n) => label(n).includes(tl)) ??
       null;
   }
   if (!el) throw new Error(`No element matched: ${target}`);
@@ -399,7 +438,7 @@ function CLICK_FN(target: string): string {
 function TYPE_FN(target: string, text: string): string {
   let el: Element | null = null;
   try {
-    el = document.querySelector(target);
+    el = (window as unknown as { __bbDeepQuery(s: string): Element | null }).__bbDeepQuery(target);
   } catch {
     /* not a selector */
   }
@@ -414,8 +453,8 @@ function TYPE_FN(target: string, text: string): string {
       el = forId ? document.getElementById(forId) : labelMatch.querySelector('input, textarea');
     }
     if (!el) {
-      const inputs = Array.from(
-        document.querySelectorAll('input, textarea, [contenteditable=""], [contenteditable="true"]'),
+      const inputs = (window as unknown as { __bbDeepAll(s: string): Element[] }).__bbDeepAll(
+        'input, textarea, [contenteditable=""], [contenteditable="true"]',
       );
       el =
         inputs.find((i) => {

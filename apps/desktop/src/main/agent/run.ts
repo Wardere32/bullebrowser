@@ -7,6 +7,7 @@ import { type BrowserWindow } from 'electron';
 import {
   DEFAULT_MODEL,
   findSkill,
+  providerFor,
   runAgent,
   type AgentStep,
   type ToolContext,
@@ -78,7 +79,11 @@ export async function startAgentRun(
   win: BrowserWindow,
   req: AgentRunRequest,
 ): Promise<{ runId: string }> {
-  const apiKey = getApiKey();
+  // Resolve the model first: each assistant authenticates with its own
+  // provider's key, so asking for the Anthropic one while running ChatGPT would
+  // fail with a confusing 401.
+  const model = req.model ?? getSettings().defaultModel ?? DEFAULT_MODEL;
+  const apiKey = getApiKey(providerFor(model));
   const conversation = conversationStore.get(req.conversationId);
   if (!conversation) throw new Error('Conversation not found');
 
@@ -150,10 +155,7 @@ export async function startAgentRun(
     try {
       assistantText = await runAgent({
         apiKey: apiKey ?? undefined,
-        // Honor the user's persisted default if the renderer didn't pass
-        // one (race before Settings loads), only falling back to the
-        // hardcoded constant when neither is available.
-        model: req.model ?? getSettings().defaultModel ?? DEFAULT_MODEL,
+        model,
         systemPrompt,
         history: conversation.messages
           .filter((m) => m !== userMsg)
