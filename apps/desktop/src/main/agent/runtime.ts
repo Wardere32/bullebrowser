@@ -42,6 +42,19 @@ export class DesktopToolRuntime implements ToolRuntime {
     // path used to propagate it, so the tool reported failure while the page
     // sat loaded in the tab. Report what actually ended up on screen instead.
     await wc.loadURL(url).catch(() => {});
+    // A page load wipes the overlay with the old document, so the agent would
+    // be invisible on a fresh page until its first click. Put the pointer back
+    // straight away, parked where a person's would be, so the user can see the
+    // agent is on the page and follow it from the first move rather than having
+    // a cursor appear from nowhere mid-action.
+    await wc
+      .executeJavaScript(
+        `${AGENT_CURSOR}; window.__bbCursorTo(Math.round(window.innerWidth * 0.28), Math.round(window.innerHeight * 0.3));`,
+      )
+      .catch(() => {
+        // about:blank, an error page, a PDF viewer — nothing to draw on, and
+        // the navigation itself still succeeded.
+      });
     return { url: wc.getURL(), title: wc.getTitle() };
   }
 
@@ -197,7 +210,7 @@ export class DesktopToolRuntime implements ToolRuntime {
     const wc = this.wcFor(tabId);
     const amount = options.amount ?? 600;
     const y = (await wc.executeJavaScript(
-      `(${SCROLL_FN.toString()})(${JSON.stringify(options.direction)}, ${amount})`,
+      `${AGENT_CURSOR}; (${SCROLL_FN.toString()})(${JSON.stringify(options.direction)}, ${amount})`,
     )) as number;
     return { scrolledTo: y };
   }
@@ -429,7 +442,7 @@ const AGENT_CURSOR = `
           '<style>' +
           ':host{all:initial}' +
           '.ptr{position:fixed;width:22px;height:22px;margin:-2px 0 0 -2px;' +
-            'transition:transform .35s cubic-bezier(.22,1,.36,1);will-change:transform;' +
+            'transition:transform .45s cubic-bezier(.22,1,.36,1);will-change:transform;' +
             'filter:drop-shadow(0 1px 3px rgba(0,0,0,.4))}' +
           '.ring{position:fixed;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;' +
             'border:2px solid #2563EB;opacity:0;pointer-events:none}' +
@@ -450,16 +463,28 @@ const AGENT_CURSOR = `
       var ring = root2.querySelector('.ring');
       var halo = root2.querySelector('.halo');
 
-      var r = el.getBoundingClientRect();
-      var x = r.left + r.width / 2;
-      var y = r.top + r.height / 2;
+      var x, y, r;
+      if (opts.at) {
+        // A bare point — used for gestures with no element, like scrolling.
+        x = opts.at.x;
+        y = opts.at.y;
+      } else {
+        r = el.getBoundingClientRect();
+        x = r.left + r.width / 2;
+        y = r.top + r.height / 2;
+      }
 
       ptr.style.transform = 'translate(' + x + 'px,' + y + 'px)';
-      halo.style.left = r.left + 'px';
-      halo.style.top = r.top + 'px';
-      halo.style.width = r.width + 'px';
-      halo.style.height = r.height + 'px';
-      halo.classList.add('go');
+
+      if (r && opts.halo !== false) {
+        halo.style.left = r.left + 'px';
+        halo.style.top = r.top + 'px';
+        halo.style.width = r.width + 'px';
+        halo.style.height = r.height + 'px';
+        halo.classList.add('go');
+      } else {
+        halo.classList.remove('go');
+      }
 
       if (opts.click) {
         ring.style.left = x + 'px';
@@ -470,12 +495,20 @@ const AGENT_CURSOR = `
       }
 
       clearTimeout(window.__bbCursorTimer);
+      // Only the halo fades. The pointer itself stays put, so the user can see
+      // where the agent is between actions instead of it teleporting out of
+      // nowhere on the next one.
       window.__bbCursorTimer = setTimeout(function () {
         halo.classList.remove('go');
-      }, 1400);
+      }, opts.hold || 1400);
     } catch (e) {
       /* never let the overlay break the action it is illustrating */
     }
+  };
+
+  // Move the pointer to a viewport point, no element involved.
+  window.__bbCursorTo = function (x, y) {
+    window.__bbCursor(null, { at: { x: x, y: y }, halo: false });
   };
 `;
 
@@ -521,11 +554,11 @@ function CLICK_FN(target: string): Promise<string> {
     setTimeout(() => {
       node.click();
       resolve(node.outerHTML.slice(0, 200));
-    }, 320);
+    }, 500);
   });
 }
 
-function TYPE_FN(target: string, text: string): string {
+function TYPE_FN(target: string, text: string): Promise<string> {
   let el: Element | null = null;
   try {
     el = (window as unknown as { __bbDeepQuery(s: string): Element | null }).__bbDeepQuery(target);
@@ -571,24 +604,63 @@ function TYPE_FN(target: string, text: string): string {
   if (!el) throw new Error(`No input matched: ${target}`);
   const html = el as HTMLElement;
   html.scrollIntoView({ block: 'center' });
-  (window as unknown as { __bbCursor(e: Element, o?: { click?: boolean }): void }).__bbCursor(html);
+  (
+    window as unknown as { __bbCursor(e: Element | null, o?: Record<string, unknown>): void }
+  ).__bbCursor(html, { click: true, hold: 4000 });
   html.focus();
+
   const isCE = html.isContentEditable;
-  if (isCE) {
-    html.textContent = text;
-    html.dispatchEvent(new InputEvent('input', { bubbles: true, data: text }));
-  } else {
-    const input = el as HTMLInputElement | HTMLTextAreaElement;
-    const nativeSetter = Object.getOwnPropertyDescriptor(
-      input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype,
-      'value',
-    )?.set;
-    if (nativeSetter) nativeSetter.call(input, text);
-    else input.value = text;
+  const input = el as HTMLInputElement | HTMLTextAreaElement;
+  const nativeSetter = isCE
+    ? null
+    : Object.getOwnPropertyDescriptor(
+        input instanceof HTMLTextAreaElement
+          ? HTMLTextAreaElement.prototype
+          : HTMLInputElement.prototype,
+        'value',
+      )?.set;
+
+  // Write the field one character at a time so the user can actually watch it
+  // being typed. Setting .value in one shot is instant and invisible — the
+  // field just changes, which is precisely the "what did it do?" problem the
+  // cursor exists to solve. Each keystroke dispatches its own input event, so
+  // controlled inputs (React et al) and live search suggestions behave exactly
+  // as they would for a human typist. Pace is capped so a long string doesn't
+  // turn into a wait.
+  const perChar = Math.max(8, Math.min(28, Math.round(1400 / Math.max(1, text.length))));
+
+  const write = (value: string) => {
+    if (isCE) {
+      html.textContent = value;
+      html.dispatchEvent(new InputEvent('input', { bubbles: true, data: value }));
+      return;
+    }
+    if (nativeSetter) nativeSetter.call(input, value);
+    else input.value = value;
     input.dispatchEvent(new Event('input', { bubbles: true }));
-    input.dispatchEvent(new Event('change', { bubbles: true }));
-  }
-  return html.outerHTML.slice(0, 200);
+  };
+
+  write('');
+  return new Promise<string>((resolve) => {
+    let i = 0;
+    const tick = () => {
+      i += 1;
+      write(text.slice(0, i));
+      if (i < text.length) {
+        setTimeout(tick, perChar);
+        return;
+      }
+      // change fires once at the end, as it would when a person leaves a field.
+      if (!isCE) input.dispatchEvent(new Event('change', { bubbles: true }));
+      resolve(html.outerHTML.slice(0, 200));
+    };
+    if (text.length === 0) {
+      if (!isCE) input.dispatchEvent(new Event('change', { bubbles: true }));
+      resolve(html.outerHTML.slice(0, 200));
+      return;
+    }
+    setTimeout(tick, perChar);
+  });
 }
 
 function SCROLL_FN(
@@ -596,18 +668,29 @@ function SCROLL_FN(
   amount: number,
 ): number {
   const doc = document.scrollingElement || document.documentElement;
+  // Park the pointer mid-viewport and let it drift the way the page is going,
+  // so a scroll reads as the agent doing something rather than the page moving
+  // on its own. No halo — there's no element being acted on.
+  const to = (window as unknown as { __bbCursorTo?(x: number, y: number): void }).__bbCursorTo;
+  if (to) {
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight / 2;
+    const drift = direction === 'up' || direction === 'top' ? -60 : 60;
+    to(cx, cy - drift);
+    setTimeout(() => to(cx, cy + drift), 60);
+  }
   switch (direction) {
     case 'down':
-      window.scrollBy({ top: amount });
+      window.scrollBy({ top: amount, behavior: 'smooth' });
       break;
     case 'up':
-      window.scrollBy({ top: -amount });
+      window.scrollBy({ top: -amount, behavior: 'smooth' });
       break;
     case 'top':
-      window.scrollTo({ top: 0 });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       break;
     case 'bottom':
-      window.scrollTo({ top: doc.scrollHeight });
+      window.scrollTo({ top: doc.scrollHeight, behavior: 'smooth' });
       break;
   }
   return doc.scrollTop;
