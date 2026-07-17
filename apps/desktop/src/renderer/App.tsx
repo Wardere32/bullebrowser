@@ -4,6 +4,7 @@ import { TopBar } from './components/TopBar.js';
 import { TabStrip } from './components/TabStrip.js';
 import { AiPanel } from './components/AiPanel.js';
 import { SettingsModal } from './components/SettingsModal.js';
+import { ConfirmDialog } from './components/ConfirmDialog.js';
 import { AboutModal } from './components/AboutModal.js';
 import { Splash } from './components/Splash.js';
 import { useBrowserStore } from './state/browser-store.js';
@@ -22,9 +23,17 @@ export function App() {
   const appendStep = useAgentStore((s) => s.appendStep);
   const finishRun = useAgentStore((s) => s.finishRun);
   const setError = useAgentStore((s) => s.setError);
+  const setPendingConfirm = useAgentStore((s) => s.setPendingConfirm);
   const initialized = useRef(false);
 
   useKeyboardShortcuts();
+
+  // The start page shows when there's nothing to browse yet: no tabs at all,
+  // or the active tab is still sitting on the start page. Must agree with
+  // isStartPage() in the tab manager, which hides the page view to match.
+  const activeTab = tabs.find((t) => t.active);
+  const showStartPage =
+    tabs.length === 0 || !activeTab?.url || activeTab.url === 'about:blank';
 
   // Initial sync with main + first tab if none.
   useEffect(() => {
@@ -72,16 +81,14 @@ export function App() {
     });
   }, [appendStep, finishRun, setError]);
 
-  // Subscribe to destructive confirm requests.
-  // NOTE: this currently auto-approves every destructive action. The policy
-  // engine + ConfirmDialog exist to prompt the user instead; wiring that up
-  // needs a live GUI test, so it's tracked as a follow-up rather than changed
-  // blind here.
+  // Consent requests from a run. Browsing access is answered inline in the
+  // chat (AiPanel); destructive actions get the modal. Both go through
+  // pendingConfirm — nothing is auto-approved on the user's behalf.
   useEffect(() => {
-    return window.bullebrowser.agent.onConfirmRequest(({ runId, id }) => {
-      void window.bullebrowser.agent.replyConfirm(runId, id, true);
-    });
-  }, []);
+    return window.bullebrowser.agent.onConfirmRequest((req) =>
+      setPendingConfirm(req),
+    );
+  }, [setPendingConfirm]);
 
   // Right-click → "Ask BulleBrowser" comes in over IPC. Open the AI
   // panel (so AiPanel mounts) and re-emit the prompt as the in-window
@@ -109,13 +116,15 @@ export function App() {
       <TopBar />
       <TabStrip />
       <div className="flex flex-1 overflow-hidden">
-        {/* The active WebContentsView is laid out by main; this placeholder
-            reserves the area visually. */}
+        {/* The active WebContentsView is laid out by main and covers this
+            area — except on the start page, where main hides the view so the
+            branded start page below shows through. */}
         <div className="flex-1 bg-surface-light">
-          {tabs.length === 0 && <Splash />}
+          {showStartPage && <Splash />}
         </div>
         {aiPanelOpen && <AiPanel />}
       </div>
+      <ConfirmDialog />
       {showSettings && <SettingsModal />}
       {showAbout && <AboutModal />}
     </div>

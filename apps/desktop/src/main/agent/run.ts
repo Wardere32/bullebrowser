@@ -11,7 +11,7 @@ import {
   type AgentStep,
   type ToolContext,
 } from '@bullebrowser/agent-core';
-import { IPC, type AgentRunRequest } from '../../shared/ipc.js';
+import { IPC, type AgentConfirmRequest, type AgentRunRequest } from '../../shared/ipc.js';
 import type { AgentStepEvent } from '../../shared/agent-events.js';
 import { conversationStore } from '../storage/conversations.js';
 import { tabManager } from '../tabs/manager.js';
@@ -100,13 +100,20 @@ export async function startAgentRun(
     activeTabId = created.id;
   }
 
+  const ask = (message: string, kind: AgentConfirmRequest['kind']) =>
+    new Promise<boolean>((resolve) => {
+      const id = randomUUID();
+      pendingConfirms.set(id, resolve);
+      win.webContents.send(IPC.AGENT_CONFIRM_REQUEST, {
+        runId,
+        id,
+        message,
+        kind,
+      } satisfies AgentConfirmRequest);
+    });
+
   const runtime = new DesktopToolRuntime({
-    request: (message: string) =>
-      new Promise<boolean>((resolve) => {
-        const id = randomUUID();
-        pendingConfirms.set(id, resolve);
-        win.webContents.send(IPC.AGENT_CONFIRM_REQUEST, { runId, id, message });
-      }),
+    request: (message: string) => ask(message, 'destructive'),
   });
 
   const skill = req.skillId ? findSkill(req.skillId) : undefined;
@@ -143,6 +150,7 @@ export async function startAgentRun(
           .map((m) => ({ role: m.role, content: m.content })),
         userMessage: req.userMessage,
         context: ctx,
+        requestBrowseAccess: () => ask(req.userMessage, 'browse_access'),
         onStep: (step) => {
           win.webContents.send(IPC.AGENT_STEP, {
             runId,
@@ -174,6 +182,11 @@ export function cancelAgentRun(runId: string) {
   const run = runs.get(runId);
   if (!run) return;
   run.controller.abort();
+  // Deny anything still waiting on the user. Without this, a run cancelled
+  // while an "Allow Access" prompt is open leaves that promise unresolved and
+  // the agent loop parked on it forever.
+  for (const resolve of run.pendingConfirms.values()) resolve(false);
+  run.pendingConfirms.clear();
   runs.delete(runId);
 }
 

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { AgentStepEvent } from '../../shared/agent-events.js';
 import type {
+  AgentConfirmRequest,
   ConversationDetail,
   ConversationSummary,
 } from '../../shared/ipc.js';
@@ -12,7 +13,7 @@ interface AgentStoreState {
   steps: AgentStepEvent[];
   status: 'idle' | 'running' | 'error';
   currentStep: string;
-  pendingConfirm: { id: string; runId: string; message: string } | null;
+  pendingConfirm: AgentConfirmRequest | null;
   setConversations: (c: ConversationSummary[]) => void;
   setCurrent: (c: ConversationDetail | null) => void;
   refreshCurrent: (c: ConversationDetail) => void;
@@ -20,9 +21,7 @@ interface AgentStoreState {
   appendStep: (s: AgentStepEvent) => void;
   finishRun: () => void;
   setError: (msg: string) => void;
-  setPendingConfirm: (
-    p: { id: string; runId: string; message: string } | null,
-  ) => void;
+  setPendingConfirm: (p: AgentConfirmRequest | null) => void;
 }
 
 export const useAgentStore = create<AgentStoreState>((set) => ({

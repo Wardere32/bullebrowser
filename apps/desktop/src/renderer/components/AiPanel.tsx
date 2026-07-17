@@ -34,6 +34,9 @@ export function AiPanel() {
   const [draft, setDraft] = useState('');
   const [skillId, setSkillId] = useState<string>('');
   const [model, setModel] = useState<ClaudeModelId>('claude-opus-4-7');
+  // null = not checked yet, so we render neither the chat nor the connect
+  // form until we know, instead of flashing the wrong one.
+  const [hasKey, setHasKey] = useState<boolean | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const runInProgress = status === 'running';
   const promptActivity = useInputActivity();
@@ -41,6 +44,7 @@ export function AiPanel() {
   useEffect(() => {
     void (async () => {
       const bridge = browserBridge();
+      setHasKey(await bridge.secrets.hasApiKey());
       const settings: AppSettings = await bridge.settings.get();
       setModel(settings.defaultModel);
       const list = await bridge.conversations.list();
@@ -151,6 +155,23 @@ export function AiPanel() {
     textareaRef.current?.focus();
   }, [current, status]);
 
+  // The task the "Allow Access" prompt is asking about — always the message
+  // that kicked off the current run.
+  const lastUserMessage =
+    [...(current?.messages ?? [])].reverse().find((m) => m.role === 'user')
+      ?.content ?? '';
+
+  // A key can be revoked or deleted while the app is open; when a run dies on
+  // an auth error, drop back to the connect form rather than leaving the user
+  // retrying a chat that cannot work.
+  useEffect(() => {
+    if (status !== 'error') return;
+    if (!/api key|401|Settings and paste/i.test(currentStep)) return;
+    void browserBridge()
+      .secrets.hasApiKey()
+      .then((present: boolean) => setHasKey(present));
+  }, [status, currentStep]);
+
   const createConversation = async () => {
     const bridge = browserBridge();
     const c = await bridge.conversations.create();
@@ -200,11 +221,16 @@ export function AiPanel() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-5">
-        {current && current.messages.length === 0 && <EmptyState />}
-        {current?.messages.map((m, i) => (
-          <Bubble key={i} role={m.role} content={m.content} />
-        ))}
-        {(status === 'running' || status === 'error') && (
+        {hasKey === false && <ConnectKey onConnected={() => setHasKey(true)} />}
+        {hasKey === true && current && current.messages.length === 0 && (
+          <EmptyState />
+        )}
+        {hasKey === true &&
+          current?.messages.map((m, i) => (
+            <Bubble key={i} role={m.role} content={m.content} />
+          ))}
+        <AllowAccess task={lastUserMessage} />
+        {hasKey === true && (status === 'running' || status === 'error') && (
           <div
             className={`mb-5 space-y-1 text-[11px] ${
               status === 'error'
@@ -223,6 +249,12 @@ export function AiPanel() {
       </div>
 
       <footer className="border-t border-line/25 p-3">
+        {hasKey === false ? (
+          <div className="px-1 py-2 text-[11px] text-ink-secondary">
+            Connect your key above to start chatting.
+          </div>
+        ) : (
+          <>
         {draft.startsWith('/') && !draft.includes(' ') && (
           <div className="mb-1 max-h-32 overflow-y-auto rounded border border-line bg-white text-[11px]">
             {SLASH_COMMANDS.filter((c) => c.name.startsWith(draft.toLowerCase())).map(
@@ -305,8 +337,110 @@ export function AiPanel() {
             </button>
           )}
         </div>
+          </>
+        )}
       </footer>
     </aside>
+  );
+}
+
+// Without a key the agent cannot answer at all, so this replaces the chat
+// rather than sitting beside it — the previous behaviour surfaced the failure
+// as one line of small red text in the step feed, which read as "the chat is
+// just broken".
+function ConnectKey({ onConnected }: { onConnected: () => void }) {
+  const [key, setKey] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const connect = async () => {
+    if (!key.trim() || busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      await browserBridge().secrets.setApiKey(key.trim());
+      setKey('');
+      onConnected();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save that key.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4 pt-2 text-sm">
+      <p className="text-[15px] font-semibold tracking-tight text-ink-primary">
+        Connect BulleBrowser AI
+      </p>
+      <p className="leading-relaxed text-ink-secondary">
+        BulleBrowser needs your key before it can browse or answer. It&apos;s
+        stored encrypted in your Mac&apos;s keychain and never leaves this
+        device.
+      </p>
+      <input
+        type="password"
+        value={key}
+        onChange={(e) => setKey(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') void connect();
+        }}
+        placeholder="sk-ant-…"
+        autoComplete="off"
+        spellCheck={false}
+        className="w-full rounded-md border border-line px-3 py-2 font-mono text-xs focus:border-primary focus:outline-none"
+      />
+      {error && <div className="text-xs text-danger">{error}</div>}
+      <button
+        type="button"
+        onClick={() => void connect()}
+        disabled={!key.trim() || busy}
+        className="rounded bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-hover disabled:bg-line"
+      >
+        {busy ? 'Connecting…' : 'Connect'}
+      </button>
+    </div>
+  );
+}
+
+// The once-per-task browsing consent, answered in the chat next to the task it
+// belongs to rather than in a modal over the page.
+function AllowAccess({ task }: { task: string }) {
+  const pending = useAgentStore((s) => s.pendingConfirm);
+  const setPending = useAgentStore((s) => s.setPendingConfirm);
+  if (!pending || pending.kind !== 'browse_access') return null;
+
+  const reply = (approved: boolean) => {
+    void browserBridge().agent.replyConfirm(pending.runId, pending.id, approved);
+    setPending(null);
+  };
+
+  return (
+    <div className="mb-6 rounded-xl border border-line/60 bg-surface-muted/40 p-4">
+      <div className="text-[13px] font-medium text-ink-primary">
+        Allow Access
+      </div>
+      <p className="mt-1 text-xs leading-relaxed text-ink-secondary">
+        BulleBrowser wants to browse the web in your tabs to do this:
+        <span className="mt-1 block italic text-ink-primary">“{task}”</span>
+      </p>
+      <div className="mt-3 flex gap-2">
+        <button
+          type="button"
+          onClick={() => reply(true)}
+          className="rounded bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-hover"
+        >
+          Allow Access
+        </button>
+        <button
+          type="button"
+          onClick={() => reply(false)}
+          className="rounded border border-line px-3 py-1.5 text-xs text-ink-secondary hover:bg-surface-muted"
+        >
+          Not now
+        </button>
+      </div>
+    </div>
   );
 }
 

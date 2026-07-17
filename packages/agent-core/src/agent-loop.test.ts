@@ -172,6 +172,123 @@ describe('runAgent Claude tool-use loop', () => {
     expect(continued).toBe(true);
   });
 
+  // Browsing consent: the agent must not touch the live web until the user has
+  // said yes, and must not nag them once per page.
+  describe('browsing consent gate', () => {
+    it('asks once per run, no matter how many pages it visits', async () => {
+      createMock
+        .mockResolvedValueOnce({
+          stop_reason: 'tool_use',
+          content: [toolUseBlock('tu1', 'navigate', { url: 'https://a.com' })],
+        })
+        .mockResolvedValueOnce({
+          stop_reason: 'tool_use',
+          content: [toolUseBlock('tu2', 'read_page', {})],
+        })
+        .mockResolvedValueOnce({
+          stop_reason: 'tool_use',
+          content: [toolUseBlock('tu3', 'navigate', { url: 'https://b.com' })],
+        })
+        .mockResolvedValueOnce({
+          stop_reason: 'end_turn',
+          content: [textBlock('Compared both pages.')],
+        });
+
+      const requestBrowseAccess = vi.fn(async () => true);
+      const context = makeContext();
+      const out = await runAgent({
+        apiKey: 'test-key',
+        model: DEFAULT_MODEL,
+        systemPrompt: 'You are the BulleBrowser agent.',
+        history: [],
+        userMessage: 'compare a.com and b.com',
+        context,
+        requestBrowseAccess,
+        onStep: () => {},
+      });
+
+      expect(requestBrowseAccess).toHaveBeenCalledOnce();
+      expect(context.runtime.navigate).toHaveBeenCalledTimes(2);
+      expect(out).toContain('Compared both pages');
+    });
+
+    it('does not touch the browser when the user denies access', async () => {
+      createMock
+        .mockResolvedValueOnce({
+          stop_reason: 'tool_use',
+          content: [toolUseBlock('tu1', 'navigate', { url: 'https://a.com' })],
+        })
+        .mockResolvedValueOnce({
+          stop_reason: 'end_turn',
+          content: [textBlock('I could not check the live page.')],
+        });
+
+      const requestBrowseAccess = vi.fn(async () => false);
+      const context = makeContext();
+      const steps: AgentStep[] = [];
+      const out = await runAgent({
+        apiKey: 'test-key',
+        model: DEFAULT_MODEL,
+        systemPrompt: 'You are the BulleBrowser agent.',
+        history: [],
+        userMessage: 'open a.com',
+        context,
+        requestBrowseAccess,
+        onStep: (s) => steps.push(s),
+      });
+
+      expect(context.runtime.navigate).not.toHaveBeenCalled();
+      expect(
+        steps.some((s) => s.type === 'error' && /declined browser access/i.test(s.detail ?? '')),
+      ).toBe(true);
+      expect(out).toContain('could not check the live page');
+    });
+
+    it('answers non-browsing questions without ever asking for access', async () => {
+      createMock.mockResolvedValueOnce({
+        stop_reason: 'end_turn',
+        content: [textBlock('2 + 2 is 4.')],
+      });
+
+      const requestBrowseAccess = vi.fn(async () => true);
+      const out = await runAgent({
+        apiKey: 'test-key',
+        model: DEFAULT_MODEL,
+        systemPrompt: 'You are the BulleBrowser agent.',
+        history: [],
+        userMessage: 'what is 2 + 2?',
+        context: makeContext(),
+        requestBrowseAccess,
+        onStep: () => {},
+      });
+
+      expect(requestBrowseAccess).not.toHaveBeenCalled();
+      expect(out).toContain('4');
+    });
+
+    it('browses without asking when no consent hook is wired (headless callers)', async () => {
+      createMock
+        .mockResolvedValueOnce({
+          stop_reason: 'tool_use',
+          content: [toolUseBlock('tu1', 'navigate', { url: 'https://a.com' })],
+        })
+        .mockResolvedValueOnce({ stop_reason: 'end_turn', content: [textBlock('Done.')] });
+
+      const context = makeContext();
+      await runAgent({
+        apiKey: 'test-key',
+        model: DEFAULT_MODEL,
+        systemPrompt: 'You are the BulleBrowser agent.',
+        history: [],
+        userMessage: 'open a.com',
+        context,
+        onStep: () => {},
+      });
+
+      expect(context.runtime.navigate).toHaveBeenCalledOnce();
+    });
+  });
+
   it('surfaces a real error (does not fake an answer) when no API key is set', async () => {
     await expect(
       runAgent({

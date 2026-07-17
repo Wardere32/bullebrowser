@@ -1,6 +1,6 @@
 export const product = {
   name: 'BulleBrowser',
-  vendor: 'BulleBrowser',
+  vendor: 'Bulle Consulting',
   tagline: 'The browser that navigates for you',
   domain: 'bullebrowser.com',
   bundleId: 'com.bulleconsulting.bullebrowser',

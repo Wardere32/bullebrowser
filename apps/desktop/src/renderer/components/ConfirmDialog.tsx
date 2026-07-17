@@ -4,7 +4,9 @@ import { Modal } from './Modal.js';
 export function ConfirmDialog() {
   const pending = useAgentStore((s) => s.pendingConfirm);
   const setPending = useAgentStore((s) => s.setPendingConfirm);
-  if (!pending) return null;
+  // Browsing access is asked for inline in the chat panel, not as a modal —
+  // a dialog over the page for "may I read this?" is heavy-handed.
+  if (!pending || pending.kind !== 'destructive') return null;
 
   const reply = (approved: boolean) => {
     void window.bullebrowser.agent.replyConfirm(pending.runId, pending.id, approved);

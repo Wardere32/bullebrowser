@@ -115,6 +115,11 @@ export interface AgentInput {
   userMessage: string;
   context: ToolContext;
   onStep: AgentStepHandler;
+  // Asked once per run, immediately before the first tool that would touch
+  // the web. Returning false doesn't fail the run — the agent simply answers
+  // from its own knowledge instead of browsing. Omit to allow browsing
+  // without asking (headless / test callers).
+  requestBrowseAccess?: () => Promise<boolean>;
 }
 
 export interface PlanStep {

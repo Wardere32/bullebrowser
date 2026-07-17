@@ -11,6 +11,13 @@ function getDefaultHome(): string {
   return getSettings().homepageUrl;
 }
 
+// A tab sitting on the start page has no web content to show. Its
+// WebContentsView is an opaque blank rectangle that would cover the branded
+// start page the renderer draws underneath, so we hide the view instead.
+export function isStartPage(url: string): boolean {
+  return !url || url === 'about:blank';
+}
+
 interface ManagedTab {
   id: string;
   view: WebContentsView;
@@ -185,11 +192,15 @@ class TabManager {
     });
     wc.on('did-navigate', (_e, url) => {
       tab.url = url;
+      // Leaving (or landing on) the start page flips whether this view should
+      // be visible at all — see isStartPage.
+      this.relayout();
       this.broadcast();
       historyStore.record({ url, title: tab.title, visitedAt: Date.now() });
     });
     wc.on('did-navigate-in-page', (_e, url) => {
       tab.url = url;
+      this.relayout();
       this.broadcast();
     });
     wc.setWindowOpenHandler(({ url }) => {
@@ -312,7 +323,7 @@ class TabManager {
           width: Math.max(0, contentWidth - right),
           height: Math.max(0, contentHeight - top),
         });
-        t.view.setVisible(true);
+        t.view.setVisible(!isStartPage(t.url));
       } else {
         t.view.setBounds({ x: 0, y: top, width: 0, height: 0 });
         t.view.setVisible(false);

@@ -58,6 +58,29 @@ const AGENT_TOOL_NAMES: ToolName[] = [
   'screenshot',
 ];
 
+// Tools that read or drive the live web. The first time the model reaches for
+// one of these, the user is asked for access ("Allow Access") — browsing on
+// someone's real, logged-in browser is a meaningful thing to consent to.
+// Everything else (answering from knowledge, listing tabs) needs no gate.
+const BROWSING_TOOL_NAMES = new Set<ToolName>([
+  'navigate',
+  'read_page',
+  'getPageMetadata',
+  'click',
+  'type',
+  'press_key',
+  'scroll',
+  'wait_for',
+  'extract',
+  'listLinks',
+  'getSelection',
+  'screenshot',
+  'new_tab',
+  'go_back',
+  'go_forward',
+  'reload',
+]);
+
 function buildToolDefs(): Anthropic.Tool[] {
   const defs: Anthropic.Tool[] = [];
   for (const name of AGENT_TOOL_NAMES) {
@@ -97,6 +120,7 @@ async function runToolCall(
   context: ToolContext,
   policy: PrivacyPolicyEngine,
   onStep: AgentStepHandler,
+  gate: BrowseGate,
 ): Promise<Anthropic.ToolResultBlockParam> {
   const name = toolUse.name as ToolName;
   const input = (toolUse.input ?? {}) as Record<string, unknown>;
@@ -114,6 +138,15 @@ async function runToolCall(
 
   const tool = getTool(name);
   if (!tool) return fail(`Unknown tool: ${name}`);
+
+  // Browsing consent, asked once per run on the first web-touching tool.
+  if (BROWSING_TOOL_NAMES.has(name) && !(await gate.allowed())) {
+    return fail(
+      'The user declined browser access for this task. Do not call any ' +
+        'browsing tool again. Answer from your own knowledge instead, and say ' +
+        'plainly that you could not check the live page.',
+    );
+  }
 
   // Privacy / safety policy: block sensitive actions outright, and require an
   // explicit user confirmation for destructive ones (submit, purchase, delete…).
@@ -165,6 +198,24 @@ async function runToolCall(
   }
 }
 
+// Asks for browsing access at most once per run and remembers the answer, so
+// a task that visits ten pages prompts the user once rather than ten times.
+// Concurrent tool calls in the same turn share the single in-flight request.
+interface BrowseGate {
+  allowed(): Promise<boolean>;
+}
+
+function createBrowseGate(request?: () => Promise<boolean>): BrowseGate {
+  if (!request) return { allowed: async () => true };
+  let pending: Promise<boolean> | null = null;
+  return {
+    allowed: () => {
+      pending ??= request();
+      return pending;
+    },
+  };
+}
+
 export async function runAgent(input: AgentInput): Promise<string> {
   const { context, onStep } = input;
 
@@ -185,7 +236,11 @@ export async function runAgent(input: AgentInput): Promise<string> {
 
   const policy = new PrivacyPolicyEngine();
   const memory = new SessionMemoryStore();
+  const gate = createBrowseGate(input.requestBrowseAccess);
 
+  // Context from the page the user is already looking at is not gated: it's
+  // the tab in front of them, and the panel is expected to know it. The
+  // consent gate covers the agent going *off* and driving the browser itself.
   onStep({ type: 'thinking', detail: 'Reading the current page…' });
   const perceived = await retrieveContext(context, memory);
 
@@ -280,7 +335,7 @@ export async function runAgent(input: AgentInput): Promise<string> {
         continue;
       }
       toolCalls += 1;
-      toolResults.push(await runToolCall(toolUse, context, policy, onStep));
+      toolResults.push(await runToolCall(toolUse, context, policy, onStep, gate));
     }
 
     messages.push({ role: 'user', content: toolResults });

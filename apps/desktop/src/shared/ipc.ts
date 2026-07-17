@@ -51,6 +51,17 @@ export const IPC = {
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC];
 
+// Two very different asks share one channel, so the renderer needs to tell
+// them apart: `browse_access` is the once-per-task "may I drive your browser?"
+// prompt shown inline in the chat, while `destructive` is the per-action
+// warning (submitting, purchasing, deleting) shown as a modal.
+export interface AgentConfirmRequest {
+  runId: string;
+  id: string;
+  message: string;
+  kind: 'browse_access' | 'destructive';
+}
+
 export interface TabState {
   id: string;
   title: string;
@@ -175,9 +186,7 @@ export interface BrowserBridge {
     onStep(
       cb: (event: { runId: string; step: AgentStepEvent }) => void,
     ): () => void;
-    onConfirmRequest(
-      cb: (event: { runId: string; id: string; message: string }) => void,
-    ): () => void;
+    onConfirmRequest(cb: (event: AgentConfirmRequest) => void): () => void;
     replyConfirm(runId: string, id: string, approved: boolean): Promise<void>;
   };
   app: {
