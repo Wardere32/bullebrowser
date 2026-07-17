@@ -60,7 +60,7 @@ export default function HomePage() {
         </h2>
         <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-ink-secondary">
           Not a chatbot bolted onto a sidebar. {product.name} is purpose-built
-          for general browser automation. Three flagship skills lead the way —
+          for general browser automation. Three flagship skills lead the way,
           and the agent takes on much more on request.
         </p>
         <div className="mt-14 grid gap-x-12 gap-y-10 sm:grid-cols-3">
@@ -73,7 +73,7 @@ export default function HomePage() {
           ))}
         </div>
         <p className="mt-10 max-w-2xl text-[15px] leading-relaxed text-ink-secondary">
-          These three lead the way — among many other tasks the agent will take
+          These three lead the way, among many other tasks the agent will take
           on. Pick a preset for a guided run, or just describe what you need in
           plain language and it works the live tab for you.
         </p>

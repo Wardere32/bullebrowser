@@ -57,6 +57,36 @@ function notaryCredentialArgs() {
   return null;
 }
 
+// Submit to the notary service with a bounded wait, retrying once on a stall.
+// `notarytool --wait` polls until Apple returns a verdict; --timeout caps that
+// poll so a stuck queue surfaces as a failure we can retry rather than an
+// indefinite hang.
+function submitWithRetry(zipPath, creds, attempts = 2, waitTimeout = '20m') {
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      console.log(
+        `notarize: submitting to Apple notary service (attempt ${attempt}/${attempts}, ` +
+          `up to ${waitTimeout})…`,
+      );
+      // Credentials are passed as argv, not interpolated into a shell string, so
+      // the app-specific password / key is never expanded by a shell.
+      execFileSync(
+        'xcrun',
+        ['notarytool', 'submit', zipPath, ...creds, '--wait', '--timeout', waitTimeout],
+        { stdio: 'inherit' },
+      );
+      return;
+    } catch (error) {
+      if (attempt === attempts) {
+        throw new Error(
+          `notarize: notarization failed after ${attempts} attempts — ${error.message}`,
+        );
+      }
+      console.warn(`notarize: attempt ${attempt} failed (${error.message}); retrying…`);
+    }
+  }
+}
+
 exports.default = async function afterSign(context) {
   if (context.electronPlatformName !== 'darwin') return;
 
@@ -94,12 +124,11 @@ exports.default = async function afterSign(context) {
   execFileSync('ditto', ['-c', '-k', '--keepParent', appPath, zipPath], { stdio: 'inherit' });
 
   try {
-    console.log('notarize: submitting to Apple notary service (this can take a few minutes)…');
-    // Credentials are passed as argv, not interpolated into a shell string, so
-    // the app-specific password / key is never expanded by a shell.
-    execFileSync('xcrun', ['notarytool', 'submit', zipPath, ...creds, '--wait'], {
-      stdio: 'inherit',
-    });
+    // A bare `--wait` blocks forever when Apple's queue stalls. The mac job
+    // notarizes twice (arm64 then x64) back to back, so one stalled submission
+    // used to hang the whole job until CI killed it — that is exactly how
+    // v0.2.16 shipped with no Intel DMG. Bound each wait and retry once.
+    submitWithRetry(zipPath, creds);
   } finally {
     fs.rmSync(zipPath, { force: true });
   }

@@ -5,7 +5,7 @@ import { DownloadButton } from '@/components/DownloadButton';
 
 export const metadata: Metadata = {
   title: 'Features',
-  description: `What the ${product.name} agent can do — capabilities, preset skills, controls, and privacy.`,
+  description: `What the ${product.name} agent can do: capabilities, preset skills, controls, and privacy.`,
 };
 
 const TOOLS = [
@@ -68,12 +68,12 @@ export default function FeaturesPage() {
       <section className="bg-surface-dark text-ink-inverse">
         <div className="mx-auto max-w-5xl px-6 py-24 md:py-32">
           <h1 className="max-w-3xl text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
-            An agent that operates the browser — so you don&apos;t have to.
+            An agent that operates the browser, so you don&apos;t have to.
           </h1>
           <p className="mt-6 max-w-2xl text-lg leading-relaxed text-ink-inverse/70">
             {product.name} pairs a real, full-featured browser with a
-            BulleBrowser-powered agent. It works the web the way a person does —
-            reading, clicking, typing, extracting — but in a deterministic,
+            BulleBrowser-powered agent. It works the web the way a person does,
+            reading, clicking, typing, and extracting, all in a deterministic,
             stoppable loop you can trust.
           </p>
         </div>
@@ -81,8 +81,8 @@ export default function FeaturesPage() {
 
       <Section eyebrow="Capabilities" title="It works the live web, not a stale index.">
         <p className="max-w-2xl text-[15px] leading-relaxed text-ink-secondary">
-          The agent acts on the active tab — same pages, same logins, same
-          data you&apos;d see — through a focused set of actions:
+          The agent acts on the active tab, with the same pages, same logins,
+          and same data you&apos;d see, through a focused set of actions:
         </p>
         <div className="mt-8 grid gap-x-10 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
           {TOOLS.map(([name, desc]) => (
@@ -94,7 +94,7 @@ export default function FeaturesPage() {
         </div>
       </Section>
 
-      <Section eyebrow="Skills" title="Three flagship skills — and a general agent for the rest.">
+      <Section eyebrow="Skills" title="Three flagship skills, and a general agent for the rest.">
         <div className="grid gap-10 md:grid-cols-3">
           {SKILLS.map((s) => (
             <div key={s.title}>
@@ -105,7 +105,7 @@ export default function FeaturesPage() {
           ))}
         </div>
         <p className="mt-10 max-w-2xl text-[15px] leading-relaxed text-ink-secondary">
-          These three lead the way — among many other tasks the agent will take
+          These three lead the way, among many other tasks the agent will take
           on. Pick a preset for a guided workflow, or just describe what you
           need in plain language and it works the live tab.
         </p>

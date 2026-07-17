@@ -16,7 +16,7 @@ export function AboutModal() {
   return (
     <Modal title="About BulleBrowser" onClose={closeAbout} width={560}>
       <div className="space-y-4 text-sm">
-        <img src={wordmark} alt="BulleBrowser" width={240} />
+        <img src={wordmark} alt="BulleBrowser" width={200} />
         <div className="text-ink-secondary">{product.tagline}</div>
 
         {info && (

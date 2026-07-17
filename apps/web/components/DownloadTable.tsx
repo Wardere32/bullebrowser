@@ -102,9 +102,9 @@ export function DownloadTable() {
                   <td className="px-4 py-3">{p.label}</td>
                   <td className="px-4 py-3 text-ink-secondary">{p.req}</td>
                   <td className="px-4 py-3 text-ink-secondary">
-                    {asset ? formatBytes(asset.size) : '—'}
+                    {asset ? formatBytes(asset.size) : 'n/a'}
                   </td>
-                  <td className="px-4 py-3 text-ink-secondary">{asset?.tag ?? '—'}</td>
+                  <td className="px-4 py-3 text-ink-secondary">{asset?.tag ?? 'n/a'}</td>
                   <td className="px-4 py-3 text-right">
                     {asset ? (
                       <a

@@ -7,7 +7,7 @@ export function Splash() {
       <img
         src={wordmarkLight}
         alt={product.name}
-        className="h-16 w-auto select-none"
+        className="h-10 w-auto select-none"
         draggable={false}
       />
       <div className="text-sm text-ink-inverse/70">{product.tagline}</div>

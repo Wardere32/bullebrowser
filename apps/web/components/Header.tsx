@@ -8,11 +8,13 @@ export function Header() {
     <header className="sticky top-0 z-30 border-b border-line bg-surface-light/85 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
         <Link href="/" aria-label={product.name} className="flex items-center">
+          {/* The wordmark art is trimmed to the glyphs, so the box height is
+              the cap height: h-6 reads as a ~24px wordmark in a 56px bar. */}
           <img
             src={asset('/wordmark.png')}
             alt={product.name}
-            height={28}
-            className="h-8 w-auto select-none"
+            height={24}
+            className="h-6 w-auto select-none"
             draggable={false}
           />
         </Link>

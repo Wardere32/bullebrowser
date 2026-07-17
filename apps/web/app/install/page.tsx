@@ -30,7 +30,8 @@ export default function InstallPage() {
   return (
     <div className="mx-auto max-w-3xl px-6 py-16">
       <div className="mb-6 inline-flex items-center gap-3 rounded-full border border-line bg-surface-muted px-4 py-2">
-        <Image src={asset('/wordmark.png')} alt={product.name} width={160} height={28} />
+        {/* 158×24 keeps the wordmark's 6.59:1 intrinsic ratio exactly. */}
+        <Image src={asset('/wordmark.png')} alt={product.name} width={158} height={24} />
         <span className="text-xs text-ink-secondary">Brand-authenticated installer path</span>
       </div>
       <h1 className="text-4xl font-bold">Install {product.name}</h1>
@@ -47,8 +48,8 @@ export default function InstallPage() {
           <p>
             <strong>macOS:</strong> open the <code>.dmg</code>, drag
             BulleBrowser into Applications, and double-click to launch. Official
-            releases are Developer ID–signed and notarized by Apple, so they open
-            normally. (Building from source? A dev build isn’t notarized —
+            releases are Developer ID-signed and notarized by Apple, so they open
+            normally. (Building from source? A dev build isn’t notarized, so
             right-click → Open → Open, or run{' '}
             <code>xattr -dr com.apple.quarantine /Applications/BulleBrowser.app</code>.)
           </p>
@@ -64,7 +65,7 @@ export default function InstallPage() {
 
         <Step n={2} title="Add your BulleBrowser AI key">
           <p>
-            BulleBrowser is bring-your-own-key — your prompts go straight to
+            BulleBrowser is bring-your-own-key, so your prompts go straight to
             your configured provider account from your device. Add a supported
             key (current format starts with <code>sk-ant-</code>), then in BulleBrowser open the
             profile menu → <strong>Settings</strong> → paste it → Save. It’s
@@ -75,8 +76,8 @@ export default function InstallPage() {
         <Step n={3} title="Open the AI panel and pick a skill">
           <p>
             Press <code>Ctrl/Cmd + Shift + A</code> (or click <strong>AI</strong>),
-            choose a preset Skill — Grant scanner, RFP comparator, or
-            Compliance review — and describe your task. The agent drives the
+            choose a preset Skill (Grant scanner, RFP comparator, or
+            Compliance review), and describe your task. The agent drives the
             tabs and hands back a results table.
           </p>
         </Step>

@@ -19,10 +19,10 @@ export function BrowserMockup() {
           <div className="mb-2 font-semibold">Browser page</div>
           <ul className="space-y-1.5">
             {[
-              'Overview — concise summary',
-              'Details — extracted main points',
-              'Action — recommended next step',
-              'Status — completed with citations',
+              'Overview: concise summary',
+              'Details: extracted main points',
+              'Action: recommended next step',
+              'Status: completed with citations',
             ].map((row) => (
               <li
                 key={row}

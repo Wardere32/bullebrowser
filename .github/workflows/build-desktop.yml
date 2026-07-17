@@ -27,6 +27,12 @@ jobs:
   build:
     name: Build ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    # The mac job notarizes twice (arm64 + x64) and each submission now waits at
+    # most 20m with one retry, so a healthy run finishes well inside this. The
+    # cap stops a wedged runner from burning the default 6h and, worse, dying
+    # mid-matrix with only one architecture published (see v0.2.16's missing
+    # Intel DMG).
+    timeout-minutes: 90
     # "1" when this run publishes a release (tag push, or a manual dispatch with
     # publish_release=true) — used to hard-fail unsigned/un-notarized macOS builds.
     env:

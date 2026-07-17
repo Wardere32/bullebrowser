@@ -118,9 +118,9 @@ export function DownloadButton({ size = 'lg' }: { size?: 'lg' | 'md' }) {
       </a>
       <div className="text-xs text-ink-secondary">
         {loaded && dl?.apiUnavailable
-          ? 'Live version check is busy — '
+          ? 'Live version check is busy; '
           : loaded && !dl?.latestTag
-            ? 'Preparing the first public release — '
+            ? 'Preparing the first public release; '
             : ''}
           {loaded && dl?.latestTag && !dl.agentReady ? `Latest is ${dl.latestTag}; ` : ''}
         <a href={RELEASES_PAGE} className="underline" target="_blank" rel="noopener noreferrer">
