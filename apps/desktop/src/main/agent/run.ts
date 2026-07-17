@@ -19,6 +19,7 @@ import { tabManager } from '../tabs/manager.js';
 import { getApiKey } from '../storage/secrets.js';
 import { getSettings } from '../storage/settings.js';
 import { DesktopToolRuntime } from './runtime.js';
+import { describeAgentError } from './errors.js';
 
 interface ActiveRun {
   controller: AbortController;
@@ -80,8 +81,8 @@ export async function startAgentRun(
   req: AgentRunRequest,
 ): Promise<{ runId: string }> {
   // Resolve the model first: each assistant authenticates with its own
-  // provider's key, so asking for the Anthropic one while running ChatGPT would
-  // fail with a confusing 401.
+  // provider's key, so fetching the wrong provider's key would fail with a
+  // confusing 401.
   const model = req.model ?? getSettings().defaultModel ?? DEFAULT_MODEL;
   const apiKey = getApiKey(providerFor(model));
   const conversation = conversationStore.get(req.conversationId);
@@ -221,27 +222,6 @@ export function replyAgentConfirm(runId: string, id: string, approved: boolean) 
 
 // Turn a thrown agent error into a clear, actionable message for the chat UI,
 // so failures (bad key, rate limit, no network) are surfaced instead of silent.
-function describeAgentError(err: unknown): string {
-  const status = (err as { status?: number })?.status;
-  const raw = err instanceof Error ? err.message : '';
-  if (status === 400 && /prompt is too long|exceed|context/i.test(raw)) {
-    return (
-      'This task grew too large to continue — the pages read so far no longer ' +
-      'fit in one conversation. Start a new chat and narrow the task (fewer ' +
-      'pages, or ask for a specific fact rather than a full summary).'
-    );
-  }
-  if (status === 400) return `The request was rejected as invalid (400). ${raw}`;
-  if (status === 401) return 'Anthropic rejected your API key (401). Check it in Settings.';
-  if (status === 403) return 'Your Anthropic API key lacks access to this model (403).';
-  if (status === 429) return 'Anthropic rate limit reached (429). Wait a moment and try again.';
-  if (status && status >= 500) return `Anthropic service error (${status}). Please retry shortly.`;
-  if (/fetch failed|ENOTFOUND|ECONNREFUSED|EAI_AGAIN|network|timed out/i.test(raw)) {
-    return 'Could not reach Anthropic. Check your internet connection and try again.';
-  }
-  return raw || 'The agent run failed unexpectedly.';
-}
-
 function stepToEvent(step: AgentStep): AgentStepEvent {
   const ts = Date.now();
   switch (step.type) {
