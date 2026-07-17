@@ -11,6 +11,13 @@ on:
       - 'packages/brand-tokens/**'
       - 'pnpm-lock.yaml'
       - '.github/workflows/deploy-web.yml'
+  # The download manifest is baked into the static export at build time from
+  # the releases API, so publishing a release does not update the site — it
+  # keeps advertising whatever was newest the last time this ran. That is how
+  # the site served an un-notarized v0.2.13 for ten days after v0.2.16 shipped.
+  # Rebuild whenever a release is published so downloads track the newest one.
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
