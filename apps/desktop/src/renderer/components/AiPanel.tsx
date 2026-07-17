@@ -4,7 +4,6 @@ import remarkGfm from 'remark-gfm';
 import { skills } from '@bullebrowser/agent-core';
 import type { ClaudeModelId } from '@bullebrowser/agent-core';
 import { useAgentStore } from '../state/agent-store.js';
-import { useBrowserStore } from '../state/browser-store.js';
 import { AGENT_PROMPT_EVENT } from '../lib/url.js';
 import { expandSlashCommand, SLASH_COMMANDS } from '../lib/slash-commands.js';
 import { useInputActivity } from '../hooks/useInputActivity.js';
@@ -318,8 +317,8 @@ function EmptyState() {
         What can I help you browse?
       </p>
       <p className="leading-relaxed text-ink-secondary">
-        Describe a task and I'll use your live tabs to browse, read, compare, and
-        report back.
+        Describe a task and I&apos;ll use your live tabs to browse, read, compare,
+        and report back.
       </p>
       <div className="space-y-3">
         {skills.map((s) => (

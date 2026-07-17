@@ -73,8 +73,12 @@ export function App() {
   }, [appendStep, finishRun, setError]);
 
   // Subscribe to destructive confirm requests.
+  // NOTE: this currently auto-approves every destructive action. The policy
+  // engine + ConfirmDialog exist to prompt the user instead; wiring that up
+  // needs a live GUI test, so it's tracked as a follow-up rather than changed
+  // blind here.
   useEffect(() => {
-    return window.bullebrowser.agent.onConfirmRequest(({ runId, id, message }) => {
+    return window.bullebrowser.agent.onConfirmRequest(({ runId, id }) => {
       void window.bullebrowser.agent.replyConfirm(runId, id, true);
     });
   }, []);
