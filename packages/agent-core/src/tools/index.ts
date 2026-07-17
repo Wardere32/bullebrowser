@@ -2,7 +2,51 @@ import { z } from 'zod';
 import type { ToolContext, ToolDefinition, ToolName } from '../types.js';
 
 const EmptyObject = z.object({}).strict();
-const NavigateInput = z.object({ url: z.string().url() });
+
+// The agent reads untrusted page text and feeds it to the model verbatim, so a
+// hostile page can try to talk the model into navigating somewhere it
+// shouldn't. z.string().url() is only `new URL()` under the hood: it happily
+// accepts file:, data:, and javascript:, none of which a *web* agent has any
+// business opening. Restrict to real web traffic, and normalize bare hosts
+// ("example.com") the way the address bar already does, since the model
+// reaches for those constantly and a hard rejection just burns a tool call.
+const WEB_SCHEMES = new Set(['http:', 'https:']);
+const BARE_HOST = /^[a-z0-9-]+(\.[a-z0-9-]+)+(\/.*)?$/i;
+
+export function normalizeAgentUrl(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const candidate = BARE_HOST.test(trimmed) ? `https://${trimmed}` : trimmed;
+  let parsed: URL;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    return null;
+  }
+  if (!WEB_SCHEMES.has(parsed.protocol)) return null;
+  return parsed.toString();
+}
+
+const NavigateInput = z.object({
+  url: z
+    .string()
+    // On the inner string: zodFieldToJsonSchema unwraps ZodEffects and would
+    // drop a description attached to the transform.
+    .describe('An http:// or https:// URL. A bare host like "example.com" is fine.')
+    .transform((value, ctx) => {
+      const normalized = normalizeAgentUrl(value);
+      if (!normalized) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            `Refusing to open "${value}". Only http:// and https:// pages can be ` +
+            'opened. Local files, data: and javascript: URLs are not permitted.',
+        });
+        return z.NEVER;
+      }
+      return normalized;
+    }),
+});
 const NavigateOutput = z.object({ url: z.string(), title: z.string() });
 const TabIdInput = z.object({ tabId: z.string().optional() });
 const ClickInput = z.object({ target: z.string().min(1) });

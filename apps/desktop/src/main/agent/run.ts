@@ -128,8 +128,17 @@ export async function startAgentRun(
     ? `${BASE_SYSTEM}\n\n${skill.systemPrompt}${checklistAppendix}`
     : BASE_SYSTEM;
 
+  const startTabId = activeTabId;
   const ctx: ToolContext = {
-    activeTabId,
+    // A live getter, not a snapshot. new_tab and switch_tab change which tab is
+    // really active, so a value captured at run start goes stale the moment the
+    // agent opens a tab: it would go on reading the new tab (those tools take an
+    // explicit tabId) while navigate/click/type/screenshot kept driving the
+    // original one — clicking a page the model isn't looking at, and
+    // screenshotting a view that relayout() has since sized to 0x0.
+    get activeTabId() {
+      return tabManager.getActiveId() ?? startTabId;
+    },
     signal: controller.signal,
     runtime,
   };
@@ -137,6 +146,7 @@ export async function startAgentRun(
   // Fire and forget — we don't await; results stream over IPC.
   void (async () => {
     let assistantText = '';
+    let lastText = '';
     try {
       assistantText = await runAgent({
         apiKey: apiKey ?? undefined,
@@ -152,6 +162,11 @@ export async function startAgentRun(
         context: ctx,
         requestBrowseAccess: () => ask(req.userMessage, 'browse_access'),
         onStep: (step) => {
+          // Keep the model's own prose as it streams. If the run later dies
+          // (context limit, network drop), the finally block can still persist
+          // what it had actually worked out instead of throwing the whole
+          // research away and leaving the conversation with only the question.
+          if (step.type === 'text' && step.detail) lastText = step.detail;
           win.webContents.send(IPC.AGENT_STEP, {
             runId,
             step: stepToEvent(step),
@@ -159,6 +174,9 @@ export async function startAgentRun(
         },
       });
     } catch (err) {
+      if (lastText) {
+        assistantText = `${lastText}\n\n_(This task stopped early: ${describeAgentError(err)})_`;
+      }
       win.webContents.send(IPC.AGENT_STEP, {
         runId,
         step: { kind: 'error', message: describeAgentError(err), ts: Date.now() } satisfies AgentStepEvent,
@@ -204,6 +222,14 @@ export function replyAgentConfirm(runId: string, id: string, approved: boolean) 
 function describeAgentError(err: unknown): string {
   const status = (err as { status?: number })?.status;
   const raw = err instanceof Error ? err.message : '';
+  if (status === 400 && /prompt is too long|exceed|context/i.test(raw)) {
+    return (
+      'This task grew too large to continue — the pages read so far no longer ' +
+      'fit in one conversation. Start a new chat and narrow the task (fewer ' +
+      'pages, or ask for a specific fact rather than a full summary).'
+    );
+  }
+  if (status === 400) return `The request was rejected as invalid (400). ${raw}`;
   if (status === 401) return 'Anthropic rejected your API key (401). Check it in Settings.';
   if (status === 403) return 'Your Anthropic API key lacks access to this model (403).';
   if (status === 429) return 'Anthropic rate limit reached (429). Wait a moment and try again.';

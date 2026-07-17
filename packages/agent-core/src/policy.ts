@@ -1,6 +1,19 @@
 import type { PlanStep, PolicyDecision } from './types.js';
 
-const SENSITIVE_FIELD_RE = /(password|passcode|token|secret|ssn|social|credit|card|cvv)/i;
+// Blocking a typing action outright is a hard stop with no user override, so
+// this has to be precise. The old pattern was bare substrings: `card` blocked
+// "Search cards" on any kanban board and `social` blocked "Social handle",
+// while still not actually detecting a password field. Anchor the terms that
+// are only ever credentials or payment data.
+const SENSITIVE_FIELD_RE =
+  /(password|passcode|\bcvv\b|\bcvc\b|\bssn\b|social security|credit[ -]?card|card ?number|security code|\bpin\b|\bapi[ -]?key\b|\bsecret\b)/i;
+
+// Redaction only affects what's echoed into the step feed, so it stays broad:
+// over-redacting a log line costs nothing, under-redacting leaks. This is the
+// original blanket pattern, kept as-is deliberately — only the *blocking*
+// decision above needed to become precise.
+const REDACT_KEY_RE = /(password|passcode|token|secret|ssn|social|credit|card|cvv)/i;
+
 const HIGH_RISK_TARGET_RE = /(submit|purchase|buy|pay|delete|remove|send|upload|publish)/i;
 
 export interface PolicyEngine {
@@ -11,14 +24,6 @@ export interface PolicyEngine {
 
 export class PrivacyPolicyEngine implements PolicyEngine {
   evaluateToolStep(step: PlanStep): PolicyDecision {
-    if (step.toolName === 'queryDom') {
-      return {
-        allowed: false,
-        reason: 'queryDom is not yet wired in this runtime. Use page text tools instead.',
-        requiresConfirmation: false,
-      };
-    }
-
     if (step.toolName === 'typeIntoField' || step.toolName === 'type') {
       const target = String(step.input.target ?? '');
       if (SENSITIVE_FIELD_RE.test(target)) {
@@ -28,7 +33,11 @@ export class PrivacyPolicyEngine implements PolicyEngine {
           requiresConfirmation: false,
         };
       }
-      return { allowed: true, requiresConfirmation: true };
+      // Typing text is not itself consequential — it's the submit/purchase
+      // click that is, and that's gated below. Prompting here meant typing a
+      // search query raised a modal, which trains people to click through the
+      // prompts that actually matter.
+      return { allowed: true, requiresConfirmation: false };
     }
 
     if (step.toolName === 'clickElement' || step.toolName === 'click') {
@@ -76,7 +85,7 @@ export class PrivacyPolicyEngine implements PolicyEngine {
     if (!value || typeof value !== 'object') return value;
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value)) {
-      out[k] = SENSITIVE_FIELD_RE.test(k) ? '[REDACTED]' : this.redact(v);
+      out[k] = REDACT_KEY_RE.test(k) ? '[REDACTED]' : this.redact(v);
     }
     return out;
   }

@@ -70,6 +70,46 @@ describe('tool registry', () => {
   });
 });
 
+// The agent feeds untrusted page text straight to the model, so a hostile page
+// can try to talk it into opening something it shouldn't. These are the cases
+// that must never reach a real browser.
+describe('navigate URL policy', () => {
+  it('refuses non-web schemes', () => {
+    for (const url of [
+      'file:///etc/passwd',
+      'file:///Users/someone/.aws/credentials',
+      'data:text/html,<h1>hi</h1>',
+      'javascript:alert(1)',
+      'chrome://settings',
+    ]) {
+      const result = tools.navigate.inputSchema.safeParse({ url });
+      expect(result.success, `${url} must be rejected`).toBe(false);
+    }
+  });
+
+  it('allows ordinary web URLs and normalizes a bare host', () => {
+    expect(tools.navigate.inputSchema.parse({ url: 'https://example.com/a?b=c' }).url).toBe(
+      'https://example.com/a?b=c',
+    );
+    // The model reaches for bare hosts constantly; rejecting them just burned
+    // a tool call.
+    expect(tools.navigate.inputSchema.parse({ url: 'example.com' }).url).toBe(
+      'https://example.com/',
+    );
+    expect(tools.navigate.inputSchema.parse({ url: '  example.com/pricing ' }).url).toBe(
+      'https://example.com/pricing',
+    );
+  });
+
+  it('still advertises a plain string to the model despite the transform', () => {
+    const schema = zodToJsonSchema(tools.navigate.inputSchema);
+    const props = schema.properties as Record<string, { type?: string; description?: string }>;
+    expect(props.url?.type).toBe('string');
+    expect(props.url?.description).toMatch(/https?/);
+    expect(schema.required).toContain('url');
+  });
+});
+
 describe('tool behavior', () => {
   it('summarizePage returns local summary with citations', async () => {
     const out = await tools.summarizePage.execute(

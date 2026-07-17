@@ -245,7 +245,11 @@ export async function runAgent(input: AgentInput): Promise<string> {
   const perceived = await retrieveContext(context, memory);
 
   const contextNote = perceived.url
-    ? `\n\nCurrent browser context:\n- Active tab: ${perceived.title ?? 'Untitled'} — ${perceived.url}`
+    ? `\n\nCurrent browser context:\n- Active tab: ${perceived.title ?? 'Untitled'} — ${perceived.url}` +
+      (perceived.unreadableReason
+        ? `\n- NOTE: this page is open but its text could not be read (${perceived.unreadableReason}). ` +
+          'Do not assume the tab is empty. Tell the user if the task depends on reading it.'
+        : '')
     : '\n\nCurrent browser context: no page is loaded yet. Use `navigate` (for ' +
       'example to a search engine) to begin.';
   const system = `${input.systemPrompt}${contextNote}`;

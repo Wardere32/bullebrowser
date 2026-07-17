@@ -21,7 +21,27 @@ export class DesktopToolRuntime implements ToolRuntime {
 
   async navigate(tabId: string, url: string) {
     const wc = this.wcFor(tabId);
-    await wc.loadURL(url);
+    // Second line of defence behind the navigate schema's allowlist: the agent
+    // drives a real browser holding the user's live sessions, so a file: or
+    // data: URL reaching this point (from a future caller, or a tool that skips
+    // validation) must still not open.
+    let scheme: string;
+    try {
+      scheme = new URL(url).protocol;
+    } catch {
+      throw new Error(`Not a valid URL: ${url}`);
+    }
+    if (scheme !== 'http:' && scheme !== 'https:') {
+      throw new Error(
+        `Refusing to open a ${scheme} URL. The agent may only open http:// and https:// pages.`,
+      );
+    }
+    // loadURL rejects with ERR_ABORTED (-3) on perfectly ordinary events: a
+    // redirect, a client-side navigation, or a URL that turns into a download.
+    // The rest of the codebase already ignores -3 (see tabs/manager.ts); this
+    // path used to propagate it, so the tool reported failure while the page
+    // sat loaded in the tab. Report what actually ended up on screen instead.
+    await wc.loadURL(url).catch(() => {});
     return { url: wc.getURL(), title: wc.getTitle() };
   }
 
@@ -69,6 +89,32 @@ export class DesktopToolRuntime implements ToolRuntime {
     return { data: { _schema: schema, _document: structured, _text: text } };
   }
 
+  // These three are optional on ToolRuntime, but the tools are offered to the
+  // model regardless, and their fallbacks fail *quietly* — getSelection returned
+  // '' (model: "nothing is selected") and listLinks regexed URLs out of body
+  // text, where hrefs never appear (model: "this page has no links"). Implement
+  // them for real; the page already exposes everything they need.
+  async getSelection(tabId: string): Promise<{ text: string }> {
+    const wc = this.wcFor(tabId);
+    const text = (await wc.executeJavaScript(
+      `String(window.getSelection ? window.getSelection().toString() : '')`,
+    )) as string;
+    return { text };
+  }
+
+  async listLinks(tabId: string): Promise<{ text: string; href: string }[]> {
+    const wc = this.wcFor(tabId);
+    return (await wc.executeJavaScript(LIST_LINKS)) as { text: string; href: string }[];
+  }
+
+  async queryDom(tabId: string, selector: string): Promise<{ matches: number }> {
+    const wc = this.wcFor(tabId);
+    const matches = (await wc.executeJavaScript(
+      `(${QUERY_DOM_FN.toString()})(${JSON.stringify(selector)})`,
+    )) as number;
+    return { matches };
+  }
+
   async screenshot(tabId: string) {
     const wc = this.wcFor(tabId);
     const image = await wc.capturePage();
@@ -103,22 +149,45 @@ export class DesktopToolRuntime implements ToolRuntime {
     return { closed: true };
   }
 
+  // goBack/goForward/reload are fire-and-forget in Electron: the history call
+  // returns immediately and the navigation lands later. Reading getURL() right
+  // after therefore returned the URL we just left, so the model saw an
+  // unchanged URL, decided the step hadn't worked, and went back a second time.
+  // Wait for the navigation to actually commit.
+  private async afterNavigation(wc: WebContents, act: () => Promise<void>): Promise<{ url: string }> {
+    const settled = new Promise<void>((resolve) => {
+      const done = () => {
+        clearTimeout(timer);
+        wc.off('did-navigate', done);
+        wc.off('did-navigate-in-page', done);
+        wc.off('did-fail-load', done);
+        resolve();
+      };
+      // Cap the wait: a history entry that resolves from cache with no network
+      // round-trip can complete before we attach, and nothing should hang.
+      const timer = setTimeout(done, 5_000);
+      wc.once('did-navigate', done);
+      wc.once('did-navigate-in-page', done);
+      wc.once('did-fail-load', done);
+    });
+    await act();
+    await settled;
+    return { url: wc.getURL() };
+  }
+
   async goBack(tabId: string): Promise<{ url: string }> {
     const wc = this.wcFor(tabId);
-    await tabManager.back(tabId);
-    return { url: wc.getURL() };
+    return this.afterNavigation(wc, () => tabManager.back(tabId));
   }
 
   async goForward(tabId: string): Promise<{ url: string }> {
     const wc = this.wcFor(tabId);
-    await tabManager.forward(tabId);
-    return { url: wc.getURL() };
+    return this.afterNavigation(wc, () => tabManager.forward(tabId));
   }
 
   async reload(tabId: string): Promise<{ url: string }> {
     const wc = this.wcFor(tabId);
-    await tabManager.reload(tabId);
-    return { url: wc.getURL() };
+    return this.afterNavigation(wc, () => tabManager.reload(tabId));
   }
 
   async scroll(
@@ -167,13 +236,17 @@ export class DesktopToolRuntime implements ToolRuntime {
       return { matched };
     }
     if (condition.networkIdle) {
-      await new Promise<void>((resolve) => {
+      const reachedIdle = await new Promise<boolean>((resolve) => {
         let settled = false;
         let inFlight = 0;
         let idleTimer: NodeJS.Timeout | null = null;
         const wr = wc.session.webRequest;
+        // webRequest is session-wide, so without this every other tab's traffic
+        // counts too. One background tab long-polling (mail, chat, any SPA
+        // heartbeat) meant inFlight never hit zero and this always timed out.
+        const ours = (d: { webContentsId?: number }) => d.webContentsId === wc.id;
 
-        const cleanup = () => {
+        const finish = (idle: boolean) => {
           if (settled) return;
           settled = true;
           if (idleTimer) clearTimeout(idleTimer);
@@ -183,11 +256,11 @@ export class DesktopToolRuntime implements ToolRuntime {
           wr.onBeforeRequest(null);
           wr.onCompleted(null);
           wr.onErrorOccurred(null);
-          resolve();
+          resolve(idle);
         };
         const armIdle = () => {
           if (idleTimer) clearTimeout(idleTimer);
-          idleTimer = setTimeout(cleanup, 500);
+          idleTimer = setTimeout(() => finish(true), 500);
         };
         const onStart = () => {
           inFlight += 1;
@@ -199,16 +272,27 @@ export class DesktopToolRuntime implements ToolRuntime {
         };
 
         // Hard cap so we always clean up even if the page never goes idle.
-        const timeoutTimer = setTimeout(cleanup, timeout);
-        wr.onBeforeRequest({ urls: ['<all_urls>'] }, (_d, cb) => {
-          onStart();
+        // Timing out is NOT idle — saying otherwise sent the model off to read
+        // a half-rendered page believing it had settled.
+        const timeoutTimer = setTimeout(() => finish(false), timeout);
+        wr.onBeforeRequest({ urls: ['<all_urls>'] }, (d, cb) => {
+          if (ours(d)) onStart();
           cb({});
         });
-        wr.onCompleted({ urls: ['<all_urls>'] }, () => onEnd());
-        wr.onErrorOccurred({ urls: ['<all_urls>'] }, () => onEnd());
-        armIdle();
+        wr.onCompleted({ urls: ['<all_urls>'] }, (d) => {
+          if (ours(d)) onEnd();
+        });
+        wr.onErrorOccurred({ urls: ['<all_urls>'] }, (d) => {
+          if (ours(d)) onEnd();
+        });
+        // Give the page a beat to actually start requesting before declaring
+        // idle. Arming immediately meant a navigate whose subresources hadn't
+        // begun within 500ms reported idle straight away.
+        setTimeout(() => {
+          if (inFlight === 0) armIdle();
+        }, 750);
       });
-      return { matched: true };
+      return { matched: reachedIdle };
     }
     return { matched: false };
   }
@@ -229,9 +313,15 @@ const EXTRACT_READABLE_TEXT = `
     if (!document.body) {
       return { error: 'Document has no body to read.' };
     }
-    const clone = document.cloneNode(true);
-    clone.querySelectorAll('script, style, noscript, iframe, svg').forEach((n) => n.remove());
-    const main = clone.querySelector('main, article, [role="main"]') || clone.body;
+    // Read innerText off the LIVE document, not a clone. innerText is defined in
+    // terms of rendered output, so on a detached clone (which is never rendered)
+    // it silently degrades to textContent: every word boundary collapses
+    // ("Sign inRegisterPricing") and display:none content — mega-menus, cookie
+    // banners, unrendered SPA routes — gets pulled in. Reading the live node
+    // fixes both, and makes the old script/style/noscript stripping redundant:
+    // those aren't rendered, so innerText already skips them. Nothing is
+    // mutated, so the user's page is untouched.
+    const main = document.querySelector('main, article, [role="main"]') || document.body;
     const text = (main.innerText || main.textContent || '').replace(/\\n{3,}/g, '\\n\\n').trim();
     if (!text) {
       return { error: 'Page is empty or rendered entirely client-side.' };
@@ -254,6 +344,34 @@ const EXTRACT_STRUCTURED = `
     return { url: location.href, title: document.title, headings, links, tables };
   })();
 `;
+
+const LIST_LINKS = `
+  (function () {
+    const out = [];
+    const seen = new Set();
+    for (const a of Array.from(document.querySelectorAll('a[href]'))) {
+      // Skip links the user cannot see and non-navigational hrefs, so the
+      // model isn't handed a mega-menu it can't act on.
+      const href = a.href;
+      if (!href || !/^https?:/i.test(href)) continue;
+      if (seen.has(href)) continue;
+      const rect = a.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) continue;
+      seen.add(href);
+      out.push({ text: (a.innerText || a.textContent || '').trim().slice(0, 120), href });
+      if (out.length >= 200) break;
+    }
+    return out;
+  })();
+`;
+
+function QUERY_DOM_FN(selector: string): number {
+  try {
+    return document.querySelectorAll(selector).length;
+  } catch {
+    throw new Error(`Invalid CSS selector: ${selector}`);
+  }
+}
 
 function CLICK_FN(target: string): string {
   let el: Element | null = null;
