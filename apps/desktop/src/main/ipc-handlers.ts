@@ -1,5 +1,6 @@
 import { app, type BrowserWindow, ipcMain, shell } from 'electron';
 import type { ProviderId } from '@bullebrowser/agent-core';
+import { getUpdateStatus, quitAndInstallUpdate } from './updater.js';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -60,6 +61,8 @@ export function registerIpc(win: BrowserWindow) {
   // settings & secrets
   ipcMain.handle(IPC.SETTINGS_GET, () => getSettings());
   ipcMain.handle(IPC.SETTINGS_SET, (_e, patch: Partial<AppSettings>) => setSettings(patch));
+  ipcMain.handle(IPC.UPDATE_GET_STATUS, () => getUpdateStatus());
+  ipcMain.handle(IPC.UPDATE_INSTALL, () => quitAndInstallUpdate());
   ipcMain.handle(IPC.SECRET_HAS_API_KEY, (_e, provider?: ProviderId) => hasApiKey(provider));
   ipcMain.handle(IPC.SECRET_SET_API_KEY, (_e, key: string, provider?: ProviderId) => setApiKey(key, provider));
   ipcMain.handle(IPC.SECRET_CLEAR_API_KEY, (_e, provider?: ProviderId) => clearApiKey(provider));

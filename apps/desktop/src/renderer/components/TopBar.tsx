@@ -5,6 +5,7 @@ import { AGENT_PROMPT_EVENT, parseAddressBarInput } from '../lib/url.js';
 import { useInputActivity } from '../hooks/useInputActivity.js';
 import { FOCUS_AI_PANEL_EVENT } from './AiPanel.js';
 import logo from '@bullebrowser/brand-tokens/logo.svg';
+import { UpdateBanner } from './UpdateBanner.js';
 
 export function TopBar() {
   const active = useBrowserStore(activeTabSelector);
@@ -109,6 +110,8 @@ export function TopBar() {
           />
         </div>
       </form>
+
+      <UpdateBanner />
 
       {status === 'running' && (
         <div className="no-drag flex items-center gap-2 rounded-full bg-accent/15 px-3 py-1 text-xs text-accent">

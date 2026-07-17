@@ -45,6 +45,10 @@ export const IPC = {
   // App
   APP_GET_INFO: 'app:get-info',
   APP_QUIT: 'app:quit',
+  // Updates
+  UPDATE_STATUS: 'update:status', // main → renderer
+  UPDATE_GET_STATUS: 'update:get-status',
+  UPDATE_INSTALL: 'update:install',
   // UI events from main → renderer
   UI_ASK_AGENT: 'ui:ask-agent', // right-click context menu hands a prompt to the AI panel
 } as const;
@@ -61,6 +65,14 @@ export interface AgentConfirmRequest {
   message: string;
   kind: 'browse_access' | 'destructive';
 }
+
+// Where an update has got to. `version` is the version being offered, which is
+// what the "Relaunch to update" button names — a bare "an update is ready" tells
+// the user nothing about what they're getting.
+export type UpdateStatus =
+  | { state: 'idle' }
+  | { state: 'downloading'; version: string }
+  | { state: 'ready'; version: string };
 
 export interface TabState {
   id: string;
@@ -192,6 +204,11 @@ export interface BrowserBridge {
   app: {
     info(): Promise<AppInfo>;
     quit(): Promise<void>;
+  };
+  updates: {
+    status(): Promise<UpdateStatus>;
+    onStatus(cb: (status: UpdateStatus) => void): () => void;
+    install(): Promise<void>;
   };
   ui: {
     onAskAgent(cb: (prompt: string) => void): () => void;

@@ -63,6 +63,11 @@ const bridge: BrowserBridge = {
     replyConfirm: (runId, id, approved) =>
       ipcRenderer.invoke(IPC.AGENT_CONFIRM_REPLY, runId, id, approved),
   },
+  updates: {
+    status: () => ipcRenderer.invoke(IPC.UPDATE_GET_STATUS),
+    onStatus: (cb) => subscribe(IPC.UPDATE_STATUS, cb),
+    install: () => ipcRenderer.invoke(IPC.UPDATE_INSTALL),
+  },
   app: {
     info: () => ipcRenderer.invoke(IPC.APP_GET_INFO),
     quit: () => ipcRenderer.invoke(IPC.APP_QUIT),

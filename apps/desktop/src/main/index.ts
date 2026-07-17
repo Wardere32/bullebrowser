@@ -44,7 +44,8 @@ async function createWindow() {
 
 app.whenReady().then(async () => {
   await createWindow();
-  setupAutoUpdate();
+  // The updater pushes status to this window, so it needs the handle.
+  if (mainWindow) setupAutoUpdate(mainWindow);
 
   app.on('second-instance', () => {
     if (mainWindow) {
