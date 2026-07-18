@@ -69,6 +69,42 @@ create, and update records. The quickest way to produce that guide is to ask the
 BulleBrowser desktop app — logged into the CRM — to explore and describe it, then
 paste its summary here.
 
+## Deploy from GitHub (Render)
+
+The backend bundles into one self-contained file, so hosting is small.
+
+```bash
+node services/widget-backend/build.mjs     # -> services/widget-backend/dist/server.mjs
+node services/widget-backend/dist/server.mjs
+```
+
+On **Render** (deploys from your GitHub repo — `render.yaml` here is a ready
+blueprint; copy it to the repo root or set these by hand):
+
+- **Build:** `corepack enable && pnpm install --frozen-lockfile && node services/widget-backend/build.mjs`
+- **Start:** `node services/widget-backend/dist/server.mjs`
+- **Env vars (secrets):** `ANTHROPIC_API_KEY`, `EEO_PUBLIC_ID`, `EEO_SECRET_KEY`
+- **Env vars (plain):** `EEO_BASE_URL` (defaults to the EEO Secure API), `ALLOWED_ORIGINS`
+  — a comma-separated allowlist of every site that embeds the widget
+  (`https://projects.bulleconsulting.com`, plus any district dashboard origin).
+
+Railway / a VPS work the same way: `pnpm install`, run the build, start the
+bundle, set the env vars. GitHub Pages **cannot** host this — it's static only,
+and a secret key can never sit in a public static file.
+
+## ⚠️ Security: the EEO key is account-level
+
+The `X-Secret-Key` can read and write the **whole account**, not just one user's
+records. So:
+
+- Put the widget on **authenticated pages** (the EEO Dashboard), where the
+  backend can check the caller's session before running.
+- If you also embed it on a **public** page (a district dashboard on GitHub
+  Pages), anyone who opens that page could drive your CRM through the account
+  key. Don't do that without adding an auth check to `/start` first.
+- Writes already confirm with the user; keep it that way, and gate which
+  endpoints are exposed if some users shouldn't create/update records.
+
 ## Not done yet / your call
 
 - **Auth**: the widget calls the backend with `credentials: 'include'`; put your

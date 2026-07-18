@@ -1,0 +1,26 @@
+# Render Blueprint for the BulleBrowser widget backend.
+# To use: put this file at the repo root (Render reads render.yaml from root),
+# connect the repo in Render, and set the three secret env vars in the dashboard.
+# Or skip the blueprint and set the Build/Start commands below by hand.
+services:
+  - type: web
+    name: bullebrowser-widget-backend
+    runtime: node
+    plan: starter
+    # Build the self-contained bundle from the monorepo (needs the workspace so
+    # agent-core's source and esbuild are present).
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && node services/widget-backend/build.mjs
+    startCommand: node services/widget-backend/dist/server.mjs
+    healthCheckPath: /nope
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false # set in the Render dashboard (secret)
+      - key: EEO_PUBLIC_ID
+        sync: false # X-Public-ID from EEO Dashboard → Manage Account → Secure API
+      - key: EEO_SECRET_KEY
+        sync: false # X-Secret-Key (secret)
+      - key: EEO_BASE_URL
+        value: https://projects.bulleconsulting.com/secure-api/
+      - key: ALLOWED_ORIGINS
+        # comma-separated: your CRM origin, plus any dashboard that embeds the widget
+        value: https://projects.bulleconsulting.com

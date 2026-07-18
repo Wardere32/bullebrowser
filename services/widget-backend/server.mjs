@@ -156,12 +156,24 @@ function body(req) {
   });
 }
 
+// Only these origins may call the backend. Set ALLOWED_ORIGINS to a
+// comma-separated list (your CRM, and any dashboard that embeds the widget).
+// With credentials, CORS cannot use "*", so we echo the caller only if it's on
+// the list. Empty list = reflect any origin (dev only — lock this down).
+const ALLOWED = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
 http
   .createServer(async (req, res) => {
-    // CORS — lock the origin down to your CRM in production.
-    res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Headers', 'content-type');
+    const origin = req.headers.origin;
+    if (origin && (ALLOWED.length === 0 || ALLOWED.includes(origin))) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Allow-Headers', 'content-type');
+    }
     if (req.method === 'OPTIONS') return res.writeHead(204).end();
 
     const u = new URL(req.url, 'http://x');

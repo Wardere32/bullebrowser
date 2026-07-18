@@ -1,0 +1,11 @@
+{
+  "name": "bullebrowser-widget-backend",
+  "private": true,
+  "type": "module",
+  "description": "Backend for the BulleBrowser embed widget: runs the agent loop, holds the keys, exposes the EEO Dashboard API as tools.",
+  "scripts": {
+    "build": "node build.mjs",
+    "start": "node dist/server.mjs",
+    "dev": "node server.mjs"
+  }
+}
