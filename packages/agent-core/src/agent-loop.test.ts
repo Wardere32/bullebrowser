@@ -289,6 +289,90 @@ describe('runAgent Claude tool-use loop', () => {
     });
   });
 
+  // API-first: the agent operates a CRM through host-supplied API tools, not
+  // just the browser.
+  describe('host-supplied API tools', () => {
+    it('offers the tool to the model and runs it, without touching the browser gate', async () => {
+      createMock
+        .mockResolvedValueOnce({
+          stop_reason: 'tool_use',
+          content: [toolUseBlock('tu1', 'crm_find_contact', { name: 'Ava Chen' })],
+        })
+        .mockResolvedValueOnce({
+          stop_reason: 'end_turn',
+          content: [textBlock('Found Ava Chen at Lumen Analytics.')],
+        });
+
+      const execute = vi.fn(async () => ({ id: 42, name: 'Ava Chen', company: 'Lumen Analytics' }));
+      const requestBrowseAccess = vi.fn(async () => true);
+      const out = await runAgent({
+        apiKey: 'test-key',
+        model: DEFAULT_MODEL,
+        systemPrompt: 'You are the CRM assistant.',
+        history: [],
+        userMessage: 'find Ava Chen',
+        context: makeContext(),
+        requestBrowseAccess,
+        extraTools: [
+          {
+            name: 'crm_find_contact',
+            description: 'Find a contact by name via the CRM API.',
+            inputSchema: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] },
+            execute,
+          },
+        ],
+        onStep: () => {},
+      });
+
+      expect(execute).toHaveBeenCalledWith({ name: 'Ava Chen' });
+      // An API tool is not a browser action, so it must not trigger the
+      // browse-consent prompt.
+      expect(requestBrowseAccess).not.toHaveBeenCalled();
+      expect(out).toContain('Ava Chen');
+
+      // The tool was advertised to the model.
+      const firstCall = createMock.mock.calls[0]?.[0] as { tools: Array<{ name: string }> };
+      expect(firstCall.tools.some((t) => t.name === 'crm_find_contact')).toBe(true);
+    });
+
+    it('confirms before a data-writing API tool, and skips it when declined', async () => {
+      createMock
+        .mockResolvedValueOnce({
+          stop_reason: 'tool_use',
+          content: [toolUseBlock('tu1', 'crm_create_task', { title: 'Follow up' })],
+        })
+        .mockResolvedValueOnce({
+          stop_reason: 'end_turn',
+          content: [textBlock('I did not create the task.')],
+        });
+
+      const execute = vi.fn(async () => ({ created: true }));
+      const confirmDestructive = vi.fn(async () => false);
+      const out = await runAgent({
+        apiKey: 'test-key',
+        model: DEFAULT_MODEL,
+        systemPrompt: 'You are the CRM assistant.',
+        history: [],
+        userMessage: 'create a task',
+        context: makeContext({ confirmDestructive }),
+        extraTools: [
+          {
+            name: 'crm_create_task',
+            description: 'Create a task via the CRM API.',
+            inputSchema: { type: 'object', properties: { title: { type: 'string' } } },
+            execute,
+            destructive: true,
+          },
+        ],
+        onStep: () => {},
+      });
+
+      expect(confirmDestructive).toHaveBeenCalledOnce();
+      expect(execute).not.toHaveBeenCalled();
+      expect(out).toContain('did not create');
+    });
+  });
+
   it('surfaces a real error (does not fake an answer) when no key is set', async () => {
     await expect(
       runAgent({

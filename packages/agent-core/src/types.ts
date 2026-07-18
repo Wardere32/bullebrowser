@@ -136,6 +136,21 @@ export interface AgentStep {
 
 export type AgentStepHandler = (step: AgentStep) => void;
 
+// A tool supplied by the host at run time — e.g. a CRM API endpoint exposed to
+// the agent for the API-first integration. The agent loop only routes calls to
+// it; the host's execute() does the work (makes the authenticated HTTP request
+// server-side). This is how the agent operates a CRM through its API rather than
+// by driving the page.
+export interface ApiTool {
+  name: string;
+  description: string;
+  /** JSON Schema (object) describing the arguments. */
+  inputSchema: Record<string, unknown>;
+  execute: (input: Record<string, unknown>) => Promise<unknown>;
+  /** Endpoints that write or delete data set this so the run confirms first. */
+  destructive?: boolean;
+}
+
 export interface AgentInput {
   apiKey?: string;
   model: ModelId;
@@ -144,6 +159,10 @@ export interface AgentInput {
   userMessage: string;
   context: ToolContext;
   onStep: AgentStepHandler;
+  // Extra tools offered to the model alongside the built-in browser tools —
+  // typically CRM API endpoints. Executed by their own execute(), not the
+  // browser, so they bypass the browsing-consent gate.
+  extraTools?: ApiTool[];
   // Asked once per run, immediately before the first tool that would touch
   // the web. Returning false doesn't fail the run — the agent simply answers
   // from its own knowledge instead of browsing. Omit to allow browsing

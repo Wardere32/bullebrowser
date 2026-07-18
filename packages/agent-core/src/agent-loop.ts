@@ -28,6 +28,7 @@ import {
   providerFor,
   type AgentInput,
   type AgentStepHandler,
+  type ApiTool,
   type ModelId,
   type PlanStep,
   type ToolContext,
@@ -142,6 +143,7 @@ export async function executeToolCall(
   policy: PrivacyPolicyEngine,
   onStep: AgentStepHandler,
   gate: BrowseGate,
+  extraTools: Map<string, ApiTool> = new Map(),
 ): Promise<ToolCallOutcome> {
   const name = rawName as ToolName;
   const input = (rawInput ?? {}) as Record<string, unknown>;
@@ -156,6 +158,27 @@ export async function executeToolCall(
     detail: `${name}(${truncate(JSON.stringify(input), 200)})`,
     data: policy.redact(input),
   });
+
+  // Host-supplied API tools run before the browser registry: they aren't
+  // browser actions, so they skip the browse-consent gate, but a data-writing
+  // endpoint still asks the user first.
+  const apiTool = extraTools.get(name);
+  if (apiTool) {
+    if (apiTool.destructive) {
+      const approved = await context.runtime.confirmDestructive(
+        `Confirm action: ${name} ${truncate(JSON.stringify(input), 300)}`,
+      );
+      if (!approved) return fail(`User declined confirmation for ${name}.`);
+    }
+    try {
+      const output = await apiTool.execute(input);
+      onStep({ type: 'tool_result', toolName: name, data: policy.redact(previewOutput(output)) });
+      const text = typeof output === 'string' ? output : JSON.stringify(output);
+      return { text: truncate(text, 100_000), isError: false };
+    } catch (error) {
+      return fail(error instanceof Error ? error.message : 'API tool failed.');
+    }
+  }
 
   const tool = getTool(name);
   if (!tool) return fail(`Unknown tool: ${name}`);
@@ -287,10 +310,21 @@ export async function runAgent(input: AgentInput): Promise<string> {
     : '\n\nCurrent browser context: no page is loaded yet. Use `navigate` (for ' +
       'example to a search engine) to begin.';
   const system = `${input.systemPrompt}${contextNote}`;
-  const toolDefs = buildToolDefs();
+
+  // Merge host-supplied API tools in with the built-in browser tools so the
+  // model can call either. The map routes execution; the defs advertise them.
+  const extraTools = new Map((input.extraTools ?? []).map((t) => [t.name, t]));
+  const toolDefs: Anthropic.Tool[] = [
+    ...buildToolDefs(),
+    ...(input.extraTools ?? []).map((t) => ({
+      name: t.name,
+      description: t.description,
+      input_schema: t.inputSchema as Anthropic.Tool.InputSchema,
+    })),
+  ];
 
   if (provider === 'openai') {
-    return runOpenAiTurns({ input, system, toolDefs, policy, gate });
+    return runOpenAiTurns({ input, system, toolDefs, policy, gate, extraTools });
   }
 
   const client = new Anthropic({ apiKey: input.apiKey });
@@ -391,6 +425,7 @@ export async function runAgent(input: AgentInput): Promise<string> {
         policy,
         onStep,
         gate,
+        extraTools,
       );
       toolResults.push(toAnthropicToolResult(toolUse.id, outcome));
     }
@@ -415,8 +450,9 @@ async function runOpenAiTurns(args: {
   toolDefs: Anthropic.Tool[];
   policy: PrivacyPolicyEngine;
   gate: BrowseGate;
+  extraTools: Map<string, ApiTool>;
 }): Promise<string> {
-  const { input, system, toolDefs, policy, gate } = args;
+  const { input, system, toolDefs, policy, gate, extraTools } = args;
   const { context, onStep } = input;
 
   const tools = toOpenAiTools(
@@ -491,6 +527,7 @@ async function runOpenAiTurns(args: {
         policy,
         onStep,
         gate,
+        extraTools,
       );
       messages.push({ role: 'tool', tool_call_id: call.id, content: outcome.text });
       // There is no image tool_result in this API, so a screenshot follows as a
