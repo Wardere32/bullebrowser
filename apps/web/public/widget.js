@@ -39,6 +39,19 @@
   'use strict';
   if (window.BulleBrowser && window.BulleBrowser.__mounted) return;
 
+  // The script tag that loaded us — captured now, while it's the running
+  // script, so a single self-configuring tag can install the widget with no
+  // inline JS (the way a chat-widget snippet usually works):
+  //   <script src="https://bullebrowser.com/widget.js"
+  //           data-endpoint="https://your-backend" data-title="BulleBrowser"></script>
+  var TAG =
+    document.currentScript ||
+    (function () {
+      var all = document.getElementsByTagName('script');
+      for (var i = all.length - 1; i >= 0; i--) if (/widget\.js/.test(all[i].src)) return all[i];
+      return null;
+    })();
+
   var CFG = { endpoint: '', title: 'BulleBrowser', accent: '#2563EB', greeting: 'Ask me to do anything on this page — I\'ll browse it for you.' };
 
   // ---- tiny helpers ---------------------------------------------------------
@@ -406,7 +419,10 @@
     __mounted: false,
     init: function (opts) {
       if (window.BulleBrowser.__mounted) return;
-      Object.assign(CFG, opts || {});
+      opts = opts || {};
+      // Only override defaults with values that were actually given, so an
+      // omitted (undefined) option doesn't wipe out its default.
+      for (var k in opts) if (opts[k] != null && opts[k] !== '') CFG[k] = opts[k];
       window.BulleBrowser.__mounted = true;
       var boot = function () {
         var api = mount();
@@ -416,4 +432,18 @@
       else window.addEventListener('DOMContentLoaded', boot);
     },
   };
+
+  // Self-install from the script tag's data-* attributes, so the whole embed
+  // can be one line with no inline script to be stripped or blocked.
+  if (TAG && TAG.getAttribute('data-endpoint')) {
+    var d = function (k) {
+      return TAG.getAttribute('data-' + k) || undefined;
+    };
+    window.BulleBrowser.init({
+      endpoint: d('endpoint'),
+      title: d('title'),
+      accent: d('accent'),
+      greeting: d('greeting'),
+    });
+  }
 })();
