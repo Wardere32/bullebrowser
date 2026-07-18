@@ -320,14 +320,20 @@ export async function runAgent(input: AgentInput): Promise<string> {
 
     onStep({ type: 'thinking', detail: 'Thinking…' });
 
-    const response = await client.messages.create({
-      model: input.model,
-      max_tokens: maxTokens,
-      ...(thinking ? { thinking } : {}),
-      system,
-      tools: toolDefs,
-      messages,
-    });
+    // Pass the abort signal to the SDK so Stop interrupts a model call that's
+    // already in flight. Without it, cancelling was only checked between turns
+    // — the user hit Stop and then waited out the whole current response.
+    const response = await client.messages.create(
+      {
+        model: input.model,
+        max_tokens: maxTokens,
+        ...(thinking ? { thinking } : {}),
+        system,
+        tools: toolDefs,
+        messages,
+      },
+      { signal: context.signal },
+    );
 
     const turnText = response.content
       .filter((b): b is Anthropic.TextBlock => b.type === 'text')

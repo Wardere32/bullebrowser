@@ -9,12 +9,13 @@ export function Header() {
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
         <Link href="/" aria-label={product.name} className="flex items-center">
           {/* Trimmed to the mark, so the box height IS the logo height.
-              36px in a 56px bar keeps the wordmark inside it legible. */}
+              40px in the 56px bar leaves an 8px margin top and bottom — bigger
+              than before, still comfortably inside the banner. */}
           <img
             src={asset('/wordmark.png')}
             alt={product.name}
-            height={36}
-            className="h-9 w-auto select-none"
+            height={40}
+            className="h-10 w-auto select-none"
             draggable={false}
           />
         </Link>

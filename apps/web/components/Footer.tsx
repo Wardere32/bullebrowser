@@ -8,16 +8,16 @@ export function Footer() {
     <footer className="border-t border-line bg-surface-muted">
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10 md:flex-row md:items-start md:justify-between">
         <div className="flex flex-col gap-2">
-          {/* Identical to the header logo: same 36px height, same wrapper, same
-              link-home behavior, so the mark reads the same and sits on the
-              same left gridline (both containers are mx-auto max-w-6xl px-6) in
-              the top and bottom chrome. */}
+          {/* Larger than the header mark (48px vs 40px): the footer has the
+              room and reads as the anchoring brand sign-off. Same wrapper and
+              link-home behavior as the header, and the same left gridline
+              (both containers are mx-auto max-w-6xl px-6). */}
           <Link href="/" aria-label={product.name} className="flex items-center">
             <img
               src={asset('/wordmark.png')}
               alt={product.name}
-              height={36}
-              className="h-9 w-auto select-none"
+              height={48}
+              className="h-12 w-auto select-none"
               draggable={false}
             />
           </Link>

@@ -177,13 +177,24 @@ export async function startAgentRun(
         },
       });
     } catch (err) {
-      if (lastText) {
-        assistantText = `${lastText}\n\n_(This task stopped early: ${describeAgentError(err)})_`;
+      // A user Stop aborts the in-flight model call, which the SDK surfaces as
+      // an abort error. That's not a failure — don't alarm the user with a red
+      // error, just keep whatever the agent had already written and end.
+      if (isCancellation(err)) {
+        if (lastText) assistantText = `${lastText}\n\n_(Stopped.)_`;
+        win.webContents.send(IPC.AGENT_STEP, {
+          runId,
+          step: { kind: 'done', ts: Date.now() } satisfies AgentStepEvent,
+        });
+      } else {
+        if (lastText) {
+          assistantText = `${lastText}\n\n_(This task stopped early: ${describeAgentError(err)})_`;
+        }
+        win.webContents.send(IPC.AGENT_STEP, {
+          runId,
+          step: { kind: 'error', message: describeAgentError(err), ts: Date.now() } satisfies AgentStepEvent,
+        });
       }
-      win.webContents.send(IPC.AGENT_STEP, {
-        runId,
-        step: { kind: 'error', message: describeAgentError(err), ts: Date.now() } satisfies AgentStepEvent,
-      });
     } finally {
       if (assistantText) {
         conversationStore.appendMessage(req.conversationId, {
@@ -197,6 +208,19 @@ export async function startAgentRun(
   })();
 
   return { runId };
+}
+
+// True when a run ended because the user pressed Stop, rather than a real
+// failure. The SDK throws an abort error on signal; our own guards throw
+// Error('cancelled').
+function isCancellation(err: unknown): boolean {
+  const name = (err as { name?: string })?.name ?? '';
+  const message = err instanceof Error ? err.message : '';
+  return (
+    name === 'AbortError' ||
+    name === 'APIUserAbortError' ||
+    /cancel|abort/i.test(message)
+  );
 }
 
 export function cancelAgentRun(runId: string) {

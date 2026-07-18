@@ -6,7 +6,7 @@ import { useAgentStore } from '../state/agent-store.js';
 import { AGENT_PROMPT_EVENT } from '../lib/url.js';
 import { expandSlashCommand, SLASH_COMMANDS } from '../lib/slash-commands.js';
 import { useInputActivity } from '../hooks/useInputActivity.js';
-import type { AppSettings } from '../../shared/ipc.js';
+import type { AppSettings, ConversationSummary } from '../../shared/ipc.js';
 import type { AgentStepEvent } from '../../shared/agent-events.js';
 
 export const FOCUS_AI_PANEL_EVENT = 'bullebrowser:focus-ai-panel';
@@ -27,11 +27,15 @@ export function AiPanel() {
   const currentStep = useAgentStore((s) => s.currentStep);
   const runId = useAgentStore((s) => s.runId);
   const [draft, setDraft] = useState('');
+  // Tasks the user submitted while a run was already going. They run one after
+  // another as each finishes, so the user can queue up work instead of waiting.
+  const [queued, setQueued] = useState<string[]>([]);
   const [skillId, setSkillId] = useState<string>('');
   const [model, setModel] = useState<ModelId>('claude-opus-4-7');
   // null = not checked yet, so we render neither the chat nor the connect
   // form until we know, instead of flashing the wrong one.
   const [hasKey, setHasKey] = useState<boolean | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const runInProgress = status === 'running';
   const promptActivity = useInputActivity();
@@ -95,15 +99,31 @@ export function AiPanel() {
   };
 
   const send = async () => {
-    if (runInProgress || !draft.trim()) return;
     const t = draft.trim();
+    if (!t) return;
     setDraft('');
     promptActivity.reset();
+    // Busy? Queue it. It'll run when the current task (and anything ahead of it
+    // in the queue) finishes. Otherwise start it now.
+    if (runInProgress || queued.length > 0) {
+      setQueued((q) => [...q, t]);
+      return;
+    }
     await sendMessage(t);
   };
 
+  // Drain the queue: whenever the agent goes idle and something is waiting,
+  // start the next task. sendMessage flips status back to running, so this
+  // won't double-fire until the next task finishes.
+  useEffect(() => {
+    if (status !== 'idle' || queued.length === 0 || !current) return;
+    const [next, ...rest] = queued;
+    setQueued(rest);
+    void sendMessage(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, queued, current]);
+
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (runInProgress) return;
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       void send();
@@ -180,7 +200,27 @@ export function AiPanel() {
     const bridge = browserBridge();
     const c = await bridge.conversations.create();
     setCurrent(c);
+    setShowHistory(false);
     setConversations(await bridge.conversations.list());
+  };
+
+  const openConversation = async (id: string) => {
+    const detail = await browserBridge().conversations.get(id);
+    if (detail) setCurrent(detail);
+    setShowHistory(false);
+  };
+
+  const deleteConversation = async (id: string) => {
+    const bridge = browserBridge();
+    await bridge.conversations.delete(id);
+    const list = await bridge.conversations.list();
+    setConversations(list);
+    // If the open chat was the one deleted, fall back to the newest remaining
+    // chat, or a fresh one if none are left, so the panel is never left empty.
+    if (current?.id === id) {
+      if (list[0]) await openConversation(list[0].id);
+      else await createConversation();
+    }
   };
 
   return (
@@ -189,14 +229,38 @@ export function AiPanel() {
         <div className="text-[13px] font-semibold tracking-tight text-ink-primary">
           BulleBrowser Agent
         </div>
-        <button
-          type="button"
-          onClick={createConversation}
-          className="rounded-md px-2 py-1 text-xs text-ink-secondary transition-colors hover:text-ink-primary"
-        >
-          New chat
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={async () => {
+              setConversations(await browserBridge().conversations.list());
+              setShowHistory((v) => !v);
+            }}
+            className={`rounded-md px-2 py-1 text-xs transition-colors ${
+              showHistory ? 'text-ink-primary' : 'text-ink-secondary hover:text-ink-primary'
+            }`}
+          >
+            History
+          </button>
+          <button
+            type="button"
+            onClick={createConversation}
+            className="rounded-md px-2 py-1 text-xs text-ink-secondary transition-colors hover:text-ink-primary"
+          >
+            New chat
+          </button>
+        </div>
       </header>
+
+      {showHistory && (
+        <HistoryList
+          conversations={conversations}
+          currentId={current?.id}
+          onOpen={openConversation}
+          onDelete={deleteConversation}
+          onClose={() => setShowHistory(false)}
+        />
+      )}
 
       <div className="flex items-center gap-3 px-4 pb-2 text-xs">
         <select
@@ -275,6 +339,29 @@ export function AiPanel() {
             {skills.find((s) => s.id === skillId)?.inputPlaceholder}
           </div>
         )}
+        {queued.length > 0 && (
+          <div className="mb-1.5 space-y-1">
+            <div className="px-1 text-[10px] font-medium uppercase tracking-wide text-ink-secondary">
+              Queued · runs next
+            </div>
+            {queued.map((q, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-2 rounded-md bg-surface-muted/60 px-2 py-1 text-[11px] text-ink-secondary"
+              >
+                <span className="flex-1 truncate">{q}</span>
+                <button
+                  type="button"
+                  onClick={() => setQueued((list) => list.filter((_, j) => j !== i))}
+                  className="shrink-0 text-ink-secondary hover:text-danger"
+                  title="Remove from queue"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="flex items-end gap-2">
           <div className="flex-1">
             <div
@@ -301,41 +388,118 @@ export function AiPanel() {
                 onBlur={promptActivity.onBlur}
                 onKeyDown={onKeyDown}
                 placeholder={
-                  'Ask BulleBrowser to do something. It will browse, read, compare, and report back.'
+                  runInProgress
+                    ? 'Add another task — it will run after this one.'
+                    : 'Ask BulleBrowser to do something. It will browse, read, compare, and report back.'
                 }
                 rows={3}
                 className="prompt-input-field"
-                aria-busy={runInProgress}
                 autoFocus={current?.messages.length === 0}
               />
             </div>
           </div>
-          {status === 'running' ? (
-            <button
-              type="button"
-              onClick={() => {
-                if (runId) void window.bullebrowser.agent.cancel(runId);
-              }}
-              className="h-9 rounded border border-danger bg-white px-3 text-sm font-medium text-danger hover:bg-danger/10"
-              title="Cancel the running agent"
-            >
-              Stop
-            </button>
-          ) : (
+          <div className="flex flex-col gap-1.5">
+            {/* Stop is always available while running, so a task can be halted.
+                Send/queue stays usable too, so the user can line up more work
+                instead of waiting. */}
+            {status === 'running' && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (runId) void window.bullebrowser.agent.cancel(runId);
+                }}
+                className="h-9 rounded border border-danger bg-white px-3 text-sm font-medium text-danger hover:bg-danger/10"
+                title="Stop the running task"
+              >
+                Stop
+              </button>
+            )}
             <button
               type="button"
               onClick={() => void send()}
               disabled={!draft.trim()}
               className="h-9 rounded bg-primary px-3 text-sm font-medium text-white hover:bg-primary-hover disabled:bg-line"
+              title={runInProgress ? 'Queue this task' : 'Send'}
             >
-              Send
+              {runInProgress ? 'Queue' : 'Send'}
             </button>
-          )}
+          </div>
         </div>
           </>
         )}
       </footer>
     </aside>
+  );
+}
+
+// Past conversations, newest first, with open-on-click and per-row delete.
+// Drops in below the header as a scrollable list rather than a modal, so it
+// feels like part of the panel.
+function HistoryList({
+  conversations,
+  currentId,
+  onOpen,
+  onDelete,
+  onClose,
+}: {
+  conversations: ConversationSummary[];
+  currentId?: string;
+  onOpen: (id: string) => void;
+  onDelete: (id: string) => void;
+  onClose: () => void;
+}) {
+  const sorted = [...conversations].sort((a, b) => b.updatedAt - a.updatedAt);
+  return (
+    <div className="border-y border-line/25 bg-surface-muted/30">
+      <div className="flex items-center justify-between px-4 py-2">
+        <span className="text-[10px] font-medium uppercase tracking-wide text-ink-secondary">
+          Chat history
+        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-xs text-ink-secondary hover:text-ink-primary"
+        >
+          Close
+        </button>
+      </div>
+      <div className="max-h-64 overflow-y-auto px-2 pb-2">
+        {sorted.length === 0 ? (
+          <div className="px-2 py-3 text-[11px] text-ink-secondary">No chats yet.</div>
+        ) : (
+          sorted.map((c) => (
+            <div
+              key={c.id}
+              className={`group flex items-center gap-2 rounded-md px-2 py-1.5 ${
+                c.id === currentId ? 'bg-primary/10' : 'hover:bg-surface-muted'
+              }`}
+            >
+              <button
+                type="button"
+                onClick={() => onOpen(c.id)}
+                className="flex-1 truncate text-left text-[12px] text-ink-primary"
+                title={c.title}
+              >
+                {c.title || 'Untitled chat'}
+                <span className="ml-2 text-[10px] text-ink-secondary">
+                  {new Date(c.updatedAt).toLocaleDateString()}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm('Delete this chat? This cannot be undone.')) onDelete(c.id);
+                }}
+                className="shrink-0 text-ink-secondary opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                title="Delete chat"
+              >
+                ✕
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
   );
 }
 
