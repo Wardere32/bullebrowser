@@ -33,8 +33,21 @@ page they're on — clicking, typing, reading, with a visible cursor.
 ## Run the backend
 
 ```bash
-ANTHROPIC_API_KEY=sk-ant-… node services/widget-backend/server.mjs   # :8787
+ANTHROPIC_API_KEY=sk-ant-… \
+EEO_PUBLIC_ID=…    \   # X-Public-ID  (from the EEO Dashboard → Manage Account → Secure API)
+EEO_SECRET_KEY=…   \   # X-Secret-Key (keep secret — env var only, never in code)
+node services/widget-backend/server.mjs                # :8787
 ```
+
+**API-first is wired.** With `EEO_PUBLIC_ID` + `EEO_SECRET_KEY` set, the agent
+gets the EEO Dashboard's Secure API as tools (`eeo_list_contacts`,
+`eeo_find_contact`, `eeo_create_contact`, `eeo_update_project`, …) — reads are
+instant, and creates/updates ask the user to confirm first. Leave those two
+unset and the agent falls back to operating the page through the widget.
+
+The key is **account-level** (not per-user), so it stays only in this backend's
+env, and you should gate which endpoints/users may write. Base URL defaults to
+`https://projects.bulleconsulting.com/secure-api/` (override with `EEO_BASE_URL`).
 
 It exposes exactly what the widget speaks:
 

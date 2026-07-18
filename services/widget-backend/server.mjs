@@ -20,24 +20,42 @@
 
 import http from 'node:http';
 import { runAgent } from '@bullebrowser/agent-core';
+import { eeoTools } from './eeo-tools.mjs';
 
 const PORT = process.env.PORT || 8787;
 const MODEL = 'claude-opus-4-7';
+
+// EEO Dashboard Secure API. The key is account-level (X-Public-ID / X-Secret-Key),
+// so it stays here in env vars — never in the widget or the page. If either is
+// unset, the agent runs browse-only.
+const EEO = {
+  baseUrl: process.env.EEO_BASE_URL || 'https://projects.bulleconsulting.com/secure-api/',
+  publicId: process.env.EEO_PUBLIC_ID,
+  secretKey: process.env.EEO_SECRET_KEY,
+};
+const API_TOOLS = EEO.publicId && EEO.secretKey ? eeoTools(EEO) : [];
 
 // Teach the agent your CRM. Replace this with the guide produced by exploring
 // Bulle Cloud (sections, key pages, how to find/create/update records, exact
 // button and menu labels). The better this is, the less the agent has to
 // rediscover each time.
 const CRM_SYSTEM = [
-  'You are the BulleBrowser assistant embedded in a CRM. You operate the page',
-  'the user is on, in their own logged-in session, by calling browser tools',
-  '(navigate within the app by clicking, read_page, click, type, scroll,',
-  'wait_for, extract). Never leave the CRM origin. Confirm before any',
-  'destructive action (delete, send, submit that commits data). When done, give',
-  'a short, clear answer and cite what you did.',
+  'You are the BulleBrowser assistant embedded in the EEO Dashboard, a cloud',
+  'project-management CRM. You help users with contacts, companies, projects,',
+  'marketing audiences, and worlds.',
+  '',
+  'Prefer the EEO API tools (eeo_*) for anything data-related — they are fast and',
+  'reliable. Before creating or updating a record, call the matching *_fields tool',
+  '(e.g. eeo_contact_fields) so you use valid field names, including custom fields.',
+  'Creating or changing data asks the user to confirm first; respect their answer.',
+  'For anything the API does not cover, you may operate the page directly (click,',
+  'type, read) — never leave the EEO Dashboard origin.',
+  '',
+  'When done, give a short, clear answer and say what you did (or would do).',
+  'Never reveal API keys or internal identifiers the user would not recognize.',
   '',
   '## CRM guide',
-  '(paste the architecture/process guide here)',
+  '(optional: paste any extra notes about your districts, worlds, and workflows here)',
 ].join('\n');
 
 /** @typedef {{ res: import('node:http').ServerResponse, pending: Map<string,{resolve:Function,reject:Function}>, seq: number, aborted: boolean }} Session */
@@ -106,6 +124,7 @@ async function start(session, prompt, url, title) {
       systemPrompt: `${CRM_SYSTEM}\n\nThe user is currently on: ${title} — ${url}`,
       history: [],
       userMessage: prompt,
+      extraTools: API_TOOLS,
       context: { activeTabId: 'page', signal: controller.signal, runtime: makeRuntime(session) },
       onStep: (step) => {
         if (step.type === 'tool_call' && step.detail) send(session, { type: 'activity', text: step.detail });
