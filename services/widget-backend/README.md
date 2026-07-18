@@ -18,16 +18,15 @@ page they're on — clicking, typing, reading, with a visible cursor.
 
 ## Embed (in the CRM, replacing LiveChat)
 
+One self-configuring script tag (drop it where the LiveChat snippet was):
+
 ```html
-<script src="https://bullebrowser.com/widget.js"></script>
-<script>
-  BulleBrowser.init({
-    endpoint: 'https://YOUR-BACKEND',       // where server.mjs is hosted
-    title: 'BulleBrowser',
-    accent: '#2563EB',
-    greeting: 'Ask me to do anything in the CRM.'
-  });
-</script>
+<script src="https://bullebrowser.com/widget.js"
+        data-endpoint="https://YOUR-BACKEND"
+        data-token="THE-SAME-VALUE-AS-WIDGET_TOKEN"
+        data-title="BulleBrowser"
+        data-accent="#2563EB"
+        data-greeting="Ask me to do anything in the dashboard."></script>
 ```
 
 ## Run the backend
