@@ -165,6 +165,21 @@ const ALLOWED = (process.env.ALLOWED_ORIGINS || '')
   .map((s) => s.trim())
   .filter(Boolean);
 
+// A shared token the widget must present, so the account-key endpoint isn't
+// open to anyone who learns its URL (CORS only stops other-origin browsers, not
+// a direct request). Set WIDGET_TOKEN to any long random string, and pass the
+// same value to the widget (data-token). Because the CRM page is only served to
+// signed-in users, the token is only ever exposed to people who already have
+// CRM access. For true per-user scoping, have the CRM mint a short-lived signed
+// token per user and verify it here instead — that's the strong version.
+const WIDGET_TOKEN = process.env.WIDGET_TOKEN || '';
+function authed(req, u, payload) {
+  if (!WIDGET_TOKEN) return true; // unset = dev; the README warns to set it
+  const bearer = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  const token = u.searchParams.get('token') || (payload && payload.token) || bearer;
+  return token === WIDGET_TOKEN;
+}
+
 http
   .createServer(async (req, res) => {
     const origin = req.headers.origin;
@@ -179,6 +194,10 @@ http
     const u = new URL(req.url, 'http://x');
 
     if (u.pathname === '/stream') {
+      // The endpoint wields an account-level key, so a caller must present the
+      // widget token. EventSource can't send headers, so the token rides in the
+      // query. See authed().
+      if (!authed(req, u)) return res.writeHead(401).end('unauthorized');
       const id = u.searchParams.get('sessionId');
       res.writeHead(200, {
         'content-type': 'text/event-stream',
@@ -195,7 +214,9 @@ http
     }
 
     if (u.pathname === '/start' && req.method === 'POST') {
-      const { sessionId, prompt, url, title } = await body(req);
+      const payload = await body(req);
+      if (!authed(req, u, payload)) return res.writeHead(401).end('unauthorized');
+      const { sessionId, prompt, url, title } = payload;
       res.writeHead(200).end('ok');
       // Give the EventSource a tick to connect, then run.
       setTimeout(() => {

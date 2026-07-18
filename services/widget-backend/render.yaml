@@ -19,6 +19,8 @@ services:
         sync: false # X-Public-ID from EEO Dashboard → Manage Account → Secure API
       - key: EEO_SECRET_KEY
         sync: false # X-Secret-Key (secret)
+      - key: WIDGET_TOKEN
+        sync: false # any long random string; the widget's data-token must match
       - key: EEO_BASE_URL
         value: https://projects.bulleconsulting.com/secure-api/
       - key: ALLOWED_ORIGINS

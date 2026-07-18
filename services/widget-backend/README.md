@@ -83,7 +83,7 @@ blueprint; copy it to the repo root or set these by hand):
 
 - **Build:** `corepack enable && pnpm install --frozen-lockfile && node services/widget-backend/build.mjs`
 - **Start:** `node services/widget-backend/dist/server.mjs`
-- **Env vars (secrets):** `ANTHROPIC_API_KEY`, `EEO_PUBLIC_ID`, `EEO_SECRET_KEY`
+- **Env vars (secrets):** `ANTHROPIC_API_KEY`, `EEO_PUBLIC_ID`, `EEO_SECRET_KEY`, `WIDGET_TOKEN` (any long random string; the widget sends the same value)
 - **Env vars (plain):** `EEO_BASE_URL` (defaults to the EEO Secure API), `ALLOWED_ORIGINS`
   — a comma-separated allowlist of every site that embeds the widget
   (`https://projects.bulleconsulting.com`, plus any district dashboard origin).

@@ -52,7 +52,7 @@
       return null;
     })();
 
-  var CFG = { endpoint: '', title: 'BulleBrowser', accent: '#2563EB', greeting: 'Ask me to do anything on this page — I\'ll browse it for you.' };
+  var CFG = { endpoint: '', token: '', title: 'BulleBrowser', accent: '#2563EB', greeting: 'Ask me to do anything on this page — I\'ll browse it for you.' };
 
   // ---- tiny helpers ---------------------------------------------------------
   function el(tag, cls, html) {
@@ -269,10 +269,10 @@
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ sessionId: sessionId, prompt: prompt, url: location.href, title: document.title }),
+      body: JSON.stringify({ sessionId: sessionId, prompt: prompt, url: location.href, title: document.title, token: CFG.token }),
     }).catch(function () {});
 
-    var es = new EventSource(base + '/stream?sessionId=' + encodeURIComponent(sessionId), { withCredentials: true });
+    var es = new EventSource(base + '/stream?sessionId=' + encodeURIComponent(sessionId) + '&token=' + encodeURIComponent(CFG.token), { withCredentials: true });
     ui.onStop(function () { try { es.close(); } catch (e) {} });
 
     es.onmessage = function (ev) {
@@ -296,7 +296,7 @@
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify(Object.assign({ sessionId: sessionId, id: id }, payload)),
+      body: JSON.stringify(Object.assign({ sessionId: sessionId, id: id, token: CFG.token }, payload)),
     }).catch(function () {});
   }
 
@@ -441,6 +441,7 @@
     };
     window.BulleBrowser.init({
       endpoint: d('endpoint'),
+      token: d('token'),
       title: d('title'),
       accent: d('accent'),
       greeting: d('greeting'),
