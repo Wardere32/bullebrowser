@@ -10,3 +10,4 @@ export * from './policy.js';
 export * from './memory.js';
 export * from './retrieval.js';
 export * from './openai-loop.js';
+export * from './dom-runtime.js';
