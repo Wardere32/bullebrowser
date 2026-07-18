@@ -1,118 +1,250 @@
 'use client';
 
-// A self-playing, looping animation of the BulleBrowser agent at work:
-// the prompt lands, the tool steps tick through, and a results table
-// builds row by row — then it resets. Not a recorded video; a live
-// in-page demo (swap in a real screen capture later if desired).
-// Honors prefers-reduced-motion by showing the completed state.
+// A self-playing loop that mirrors the real BulleBrowser experience: the app's
+// two-pane layout (browser on the left, AI agent panel on the right), an agent
+// cursor that moves around the page, types into fields, and clicks — the same
+// visible-cursor + character-by-character typing the app itself does. Not a
+// recorded video; a scripted in-page animation so it stays crisp at any size.
+// Honors prefers-reduced-motion by holding the finished state.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-const STEPS = [
-  'navigate  example.com/docs',
-  'type  “summarize the page”',
-  'click  relevant link',
-  'extract  key_points[]',
+// Cursor positions are percentages of the browser pane, so the overlay scales
+// with the mockup.
+interface Beat {
+  ms: number;
+  cursor?: { x: number; y: number };
+  click?: boolean;
+  address?: string; // typed into the address bar, character by character
+  page?: 'blank' | 'results' | 'article';
+  prompt?: string; // typed into the chat composer, character by character
+  activity?: string; // the agent's current action, shown in the feed
+  answer?: boolean; // reveal the assistant's answer
+}
+
+// One full run. Each beat is applied in order, then it loops.
+const SCRIPT: Beat[] = [
+  { ms: 400, cursor: { x: 78, y: 88 }, page: 'blank' },
+  { ms: 1400, prompt: 'Find the tallest mountain in Japan and its height' },
+  { ms: 500, activity: 'Starting…', cursor: { x: 40, y: 8 } },
+  { ms: 1000, address: 'duckduckgo.com/?q=tallest mountain in japan', activity: 'Opening duckduckgo.com' },
+  { ms: 700, page: 'results', activity: 'Reading the results' },
+  { ms: 900, cursor: { x: 30, y: 42 }, activity: 'Reading the results' },
+  { ms: 500, cursor: { x: 30, y: 42 }, click: true, activity: 'Opening the top result' },
+  { ms: 800, page: 'article', address: 'en.wikipedia.org/wiki/Mount_Fuji', activity: 'Reading the page' },
+  { ms: 900, cursor: { x: 55, y: 55 }, activity: 'Reading the page' },
+  { ms: 900, activity: 'Writing the answer', answer: true },
+  { ms: 2600, cursor: { x: 78, y: 88 } },
 ];
 
-const ROWS = [
-  ['Overview', 'Found a concise summary'],
-  ['Details', 'Extracted the main points'],
-  ['Action', 'Recommended next step'],
-  ['Status', 'Completed with citations'],
-];
+interface State {
+  cursor: { x: number; y: number };
+  click: boolean;
+  address: string;
+  page: 'blank' | 'results' | 'article';
+  prompt: string;
+  activity: string;
+  answer: boolean;
+}
 
-// Total frames in one loop. Steps tick, then rows fill, then a pause.
-const FRAMES = STEPS.length + ROWS.length + 3;
+const START: State = {
+  cursor: { x: 78, y: 88 },
+  click: false,
+  address: '',
+  page: 'blank',
+  prompt: '',
+  activity: '',
+  answer: false,
+};
+
+const FINAL_STATE: State = {
+  cursor: { x: 78, y: 88 },
+  click: false,
+  address: 'en.wikipedia.org/wiki/Mount_Fuji',
+  page: 'article',
+  prompt: 'Find the tallest mountain in Japan and its height',
+  activity: 'Done',
+  answer: true,
+};
 
 export function AgentDemo() {
-  const [frame, setFrame] = useState(0);
-  const [animate, setAnimate] = useState(true);
+  const [s, setS] = useState<State>(START);
+  const timers = useRef<number[]>([]);
 
   useEffect(() => {
     const reduce =
       typeof window !== 'undefined' &&
       window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     if (reduce) {
-      setAnimate(false);
-      setFrame(FRAMES); // show completed state
+      setS(FINAL_STATE);
       return;
     }
-    const id = setInterval(() => setFrame((f) => (f + 1) % FRAMES), 1100);
-    return () => clearInterval(id);
-  }, []);
 
-  const stepsDone = Math.min(frame, STEPS.length);
-  const rowsShown = Math.max(0, Math.min(frame - STEPS.length, ROWS.length));
-  const working = animate && frame < STEPS.length + ROWS.length;
+    let cancelled = false;
+    const clearAll = () => {
+      timers.current.forEach(clearTimeout);
+      timers.current = [];
+    };
+
+    // Reveal a target string one character at a time into a field of `state`,
+    // the way the app types into a field rather than pasting it whole.
+    const typeInto = (key: 'address' | 'prompt', text: string, startAt: number, totalMs: number) => {
+      const per = Math.max(16, totalMs / Math.max(1, text.length));
+      for (let i = 1; i <= text.length; i++) {
+        timers.current.push(
+          window.setTimeout(() => {
+            if (!cancelled) setS((prev) => ({ ...prev, [key]: text.slice(0, i) }));
+          }, startAt + i * per),
+        );
+      }
+    };
+
+    const run = () => {
+      clearAll();
+      setS(START);
+      let t = 0;
+      for (const beat of SCRIPT) {
+        const at = t;
+        timers.current.push(
+          window.setTimeout(() => {
+            if (cancelled) return;
+            setS((prev) => ({
+              ...prev,
+              ...(beat.cursor ? { cursor: beat.cursor } : {}),
+              click: !!beat.click,
+              ...(beat.page ? { page: beat.page } : {}),
+              ...(beat.activity ? { activity: beat.activity } : {}),
+              ...(beat.answer ? { answer: true } : {}),
+            }));
+          }, at),
+        );
+        if (beat.address !== undefined) typeInto('address', beat.address, at, Math.min(1000, beat.ms));
+        if (beat.prompt !== undefined) typeInto('prompt', beat.prompt, at, Math.min(1400, beat.ms));
+        t += beat.ms;
+      }
+      timers.current.push(window.setTimeout(run, t + 400)); // loop
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+      clearAll();
+    };
+  }, []);
 
   return (
     <div className="overflow-hidden rounded-xl border border-white/10 bg-white shadow-2xl ring-1 ring-black/5">
-      {/* title bar */}
-      <div className="flex items-center gap-2 bg-surface-dark px-3 py-2">
-        <span className="h-2.5 w-2.5 rounded-full bg-red-400/80" />
-        <span className="h-2.5 w-2.5 rounded-full bg-yellow-300/80" />
-        <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/80" />
-        <div className="ml-3 flex h-5 flex-1 items-center truncate rounded-md bg-white/10 px-2 text-[10px] text-white/70">
-          example.com/docs
-        </div>
-        <div className="rounded bg-primary px-2 py-0.5 text-[10px] font-semibold text-white">AI</div>
-      </div>
-
-      <div className="grid grid-cols-[1fr_170px] text-[11px]">
-        {/* page: results build in */}
-        <div className="border-r border-line p-3">
-          <div className="mb-2 font-semibold text-ink-primary">Browser page</div>
-          <ul className="space-y-1.5">
-            {ROWS.map((r, i) => (
-              <li
-                key={r[0]}
-                className={`rounded border px-2 py-1.5 transition-all duration-500 ${
-                  i < rowsShown
-                    ? `${i === 0 ? 'border-accent shadow-[0_0_0_2px_rgba(245,158,11,.18)]' : 'border-line'} opacity-100`
-                    : 'translate-y-1 border-line opacity-0'
-                }`}
-              >
-                <div className="font-medium text-ink-primary">{r[0]}</div>
-                <div className="text-[10px] text-ink-secondary">{r[1]}</div>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* AI panel: prompt + ticking steps */}
-        <div className="bg-surface-muted p-2">
-          <div className="text-[10px] font-semibold text-ink-primary">AI agent</div>
-          <div className="mt-1 rounded bg-primary px-2 py-1 text-[10px] leading-snug text-white">
-            Summarize this page and tell me what matters
+      <div className="grid grid-cols-[1fr_190px]">
+        {/* ---- Browser pane ---- */}
+        <div className="relative border-r border-line">
+          <div className="flex items-center gap-2 bg-surface-dark px-3 py-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-red-400/80" />
+            <span className="h-2.5 w-2.5 rounded-full bg-yellow-300/80" />
+            <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/80" />
+            <div className="ml-2 flex h-5 flex-1 items-center truncate rounded-md bg-white/10 px-2 text-[10px] text-white/80">
+              {s.address || 'Search or enter address'}
+              {s.address && s.page === 'blank' && <span className="ml-0.5 animate-pulse">|</span>}
+            </div>
           </div>
-          <div className="mt-2 space-y-1 font-mono text-[9.5px] leading-relaxed text-ink-secondary">
-            {STEPS.map((s, i) => (
-              <div
-                key={s}
-                className={`transition-opacity duration-300 ${
-                  i < stepsDone ? 'opacity-100' : 'opacity-30'
-                }`}
-              >
-                <span className={i < stepsDone ? 'text-emerald-600' : 'text-ink-secondary'}>
-                  {i < stepsDone ? '✓' : '→'}
-                </span>{' '}
-                {s}
+
+          <div className="relative h-[190px] overflow-hidden p-3 text-[11px]">
+            <PageContent page={s.page} />
+            {/* the agent cursor moving over the page */}
+            <div
+              className="pointer-events-none absolute z-10 transition-all duration-500 ease-out"
+              style={{ left: `${s.cursor.x}%`, top: `${s.cursor.y}%` }}
+            >
+              {s.click && (
+                <span className="absolute -left-2 -top-2 h-5 w-5 animate-ping rounded-full bg-primary/40" />
+              )}
+              <svg viewBox="0 0 24 24" className="h-4 w-4 drop-shadow" fill="none">
+                <path
+                  d="M5 3l14 8.5-6.2 1.4L9.8 19 5 3z"
+                  fill="#fff"
+                  stroke="#111"
+                  strokeWidth="1.3"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        {/* ---- AI agent panel (mirrors the app) ---- */}
+        <div className="flex flex-col bg-surface-light">
+          <div className="px-3 py-2 text-[11px] font-semibold text-ink-primary">BulleBrowser Agent</div>
+          <div className="flex-1 space-y-2 overflow-hidden px-3 text-[10px]">
+            {s.prompt && (
+              <div className="ml-auto max-w-[92%] rounded-lg rounded-br-sm bg-primary px-2 py-1 text-white">
+                {s.prompt}
+                {!s.answer && !s.activity && <span className="ml-0.5 animate-pulse">|</span>}
               </div>
-            ))}
+            )}
+            {s.activity && !s.answer && (
+              <div className="flex items-center gap-1.5 rounded-md border border-line/60 bg-surface-muted/40 px-2 py-1 text-ink-primary">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
+                <span className="truncate">{s.activity}</span>
+              </div>
+            )}
+            {s.answer && (
+              <div className="text-ink-primary">
+                The tallest mountain in Japan is{' '}
+                <span className="font-semibold">Mount Fuji</span>, at{' '}
+                <span className="font-semibold">3,776&nbsp;m</span> (12,388&nbsp;ft).
+                <div className="mt-1 text-[9px] text-ink-secondary">
+                  Source: en.wikipedia.org/wiki/Mount_Fuji
+                </div>
+              </div>
+            )}
           </div>
-          <div
-            className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9.5px] font-medium ${
-              working ? 'bg-accent/15 text-accent' : 'bg-emerald-50 text-emerald-700'
-            }`}
-          >
-            <span
-              className={`h-1.5 w-1.5 rounded-full ${working ? 'animate-pulse bg-accent' : 'bg-emerald-500'}`}
-            />
-            {working ? 'working…' : `${ROWS.length} outputs`}
+          <div className="m-2 rounded-lg border border-primary/30 px-2 py-1.5 text-[9.5px] text-ink-secondary">
+            Ask BulleBrowser to do something…
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function PageContent({ page }: { page: State['page'] }) {
+  if (page === 'blank') {
+    return (
+      <div className="flex h-full items-center justify-center text-ink-secondary/60">
+        <div className="text-center">
+          <div className="mx-auto mb-1 h-6 w-6 rounded-full border-2 border-primary/40" />
+          <div className="text-[10px]">New tab</div>
+        </div>
+      </div>
+    );
+  }
+  if (page === 'results') {
+    return (
+      <div className="space-y-2">
+        <div className="h-4 w-1/2 rounded bg-surface-muted" />
+        {['Mount Fuji - Wikipedia', 'List of mountains of Japan', 'Tallest peaks in Japan'].map(
+          (r, i) => (
+            <div key={r} className={`rounded px-1 py-0.5 ${i === 0 ? 'bg-primary/5' : ''}`}>
+              <div className="text-[10px] font-medium text-primary">{r}</div>
+              <div className="text-[9px] text-ink-secondary">
+                en.wikipedia.org — a concise overview and key facts…
+              </div>
+            </div>
+          ),
+        )}
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-1.5">
+      <div className="text-[13px] font-bold text-ink-primary">Mount Fuji</div>
+      <div className="h-2 w-full rounded bg-surface-muted" />
+      <div className="h-2 w-11/12 rounded bg-surface-muted" />
+      <div className="rounded border border-line bg-surface-muted/40 px-2 py-1 text-[9.5px]">
+        <span className="text-ink-secondary">Elevation:</span>{' '}
+        <span className="font-semibold text-ink-primary">3,776 m (12,388 ft)</span>
+      </div>
+      <div className="h-2 w-10/12 rounded bg-surface-muted" />
+      <div className="h-2 w-3/4 rounded bg-surface-muted" />
     </div>
   );
 }
