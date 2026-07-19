@@ -37,7 +37,11 @@ export async function transcribeAudio(
 
   const type = mime || 'audio/webm';
   const form = new FormData();
-  form.append('file', new Blob([bytes], { type }), `speech.${extFor(type)}`);
+  // Copy into a standalone ArrayBuffer: `bytes` may be a view with a non-zero
+  // byteOffset (or be backed by a SharedArrayBuffer), neither of which is a
+  // valid BlobPart. slice() gives us an owned, zero-offset buffer.
+  const body = bytes.slice().buffer as ArrayBuffer;
+  form.append('file', new Blob([body], { type }), `speech.${extFor(type)}`);
   form.append('model', 'whisper-1');
   form.append('response_format', 'json');
 

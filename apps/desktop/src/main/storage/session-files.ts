@@ -21,6 +21,9 @@ import { createStore } from './store.js';
 
 export const RETENTION_MS = 8 * 24 * 60 * 60 * 1000; // 8 days
 
+// Exactly the shape randomUUID() produces — see pathFor().
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // Extensions we can hand the agent as inline text. Everything else attaches as
 // an opaque blob (still uploaded, just no excerpt).
 const TEXT_EXTS = new Set([
@@ -53,7 +56,12 @@ class SessionFileStore {
     return d;
   }
 
+  // Ids are the randomUUIDs we minted, and they are the ONLY thing that ever
+  // reaches the filesystem here. Ids arrive over IPC from the renderer, so an
+  // id like '../../…' would otherwise turn remove() into an arbitrary-file
+  // delete. Anything that isn't a plain UUID is refused outright.
   private pathFor(id: string): string {
+    if (!UUID_RE.test(id)) throw new Error(`Refusing to use an invalid file id: ${id}`);
     return join(this.dir(), id);
   }
 
@@ -88,11 +96,14 @@ class SessionFileStore {
         const size = statSync(src).size;
         const id = randomUUID();
         copyFileSync(src, this.pathFor(id));
-        const ext = extname(src).toLowerCase();
+        const name = basename(src);
+        // extname('.env') === '', so a dotfile would look extension-less and be
+        // written off as binary. For those the whole name IS the extension.
+        const ext = (extname(name) || (name.startsWith('.') ? name : '')).toLowerCase();
         const now = Date.now();
         const meta: SessionFile = {
           id,
-          name: basename(src),
+          name,
           mime: MIME[ext] ?? 'application/octet-stream',
           sizeBytes: size,
           addedAt: now,

@@ -147,6 +147,11 @@ export function AgentPanel() {
     const run = () => {
       clearAll();
       setS(START);
+      // The feed is emptied on each loop, so re-pin to the bottom. Without this
+      // a visitor who scrolled up once left atBottom false forever: the panel
+      // never auto-followed again and the "jump to latest" arrow stuck around
+      // on a conversation that had already restarted.
+      setAtBottom(true);
       let t = 300;
 
       // ---- Turn 1: research -------------------------------------------------

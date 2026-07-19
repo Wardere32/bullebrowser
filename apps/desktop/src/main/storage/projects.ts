@@ -6,6 +6,7 @@
 import { randomUUID } from 'node:crypto';
 import type { ProjectDetail, ProjectSummary } from '../../shared/ipc.js';
 import { createStore } from './store.js';
+import { sessionFileStore } from './session-files.js';
 
 interface ProjectsSchema extends Record<string, unknown> {
   projects: ProjectDetail[];
@@ -22,15 +23,27 @@ const toSummary = (p: ProjectDetail): ProjectSummary => ({
 class ProjectStore {
   private store = createStore<ProjectsSchema>('projects', { projects: [] });
 
+  // Session files expire after 8 days, but a project keeps referencing them by
+  // id. Drop ids whose file is gone so the UI's "N files" matches what the
+  // agent will actually receive, rather than counting files it can no longer
+  // read. Read-side only — the stored list is left alone.
+  private live(p: ProjectDetail): ProjectDetail {
+    const fileIds = p.fileIds.filter((id) => sessionFileStore.get(id) !== null);
+    return fileIds.length === p.fileIds.length
+      ? p
+      : { ...p, fileIds, fileCount: fileIds.length };
+  }
+
   list(): ProjectSummary[] {
     return this.store
       .get('projects')
-      .map(toSummary)
+      .map((p) => toSummary(this.live(p)))
       .sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
   get(id: string): ProjectDetail | null {
-    return this.store.get('projects').find((p) => p.id === id) ?? null;
+    const found = this.store.get('projects').find((p) => p.id === id);
+    return found ? this.live(found) : null;
   }
 
   create(name: string): ProjectDetail {
@@ -51,8 +64,9 @@ class ProjectStore {
   private write(id: string, mutate: (p: ProjectDetail) => ProjectDetail): ProjectDetail | null {
     const all = this.store.get('projects');
     const idx = all.findIndex((p) => p.id === id);
-    if (idx === -1) return null;
-    const updated = { ...mutate(all[idx]), updatedAt: Date.now() };
+    const existing = idx === -1 ? undefined : all[idx];
+    if (!existing) return null;
+    const updated = { ...mutate(existing), updatedAt: Date.now() };
     updated.fileCount = updated.fileIds.length;
     const next = [...all];
     next[idx] = updated;

@@ -40,6 +40,12 @@ export function VoiceOverlay({
   const [error, setError] = useState('');
   const [levels, setLevels] = useState<number[]>(() => Array(BARS).fill(0.25));
 
+  // The live bar transforms and the pulsing dot are animations in their own
+  // right; the CSS media query only silences the idle fallback keyframes.
+  const reduceMotion =
+    typeof window !== 'undefined' &&
+    !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
   const streamRef = useRef<MediaStream | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -55,6 +61,26 @@ export function VoiceOverlay({
 
   useEffect(() => {
     let cancelled = false;
+    // A previous session (e.g. switching mic → Voice Mode without unmounting)
+    // left this true on cleanup; reset it or this session is dead on arrival.
+    closedRef.current = false;
+
+    // Tear the mic/loop down WITHOUT unmounting, so an unrecoverable error can
+    // stop everything while the overlay stays up showing what went wrong.
+    // Idempotent; also used by the unmount cleanup.
+    const stopEverything = () => {
+      closedRef.current = true;
+      cancelAnimationFrame(rafRef.current);
+      try {
+        if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+          recorderRef.current.stop();
+        }
+      } catch {
+        /* already stopped */
+      }
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      void audioCtxRef.current?.close().catch(() => {});
+    };
 
     const pickMime = () => {
       const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
@@ -87,20 +113,27 @@ export function VoiceOverlay({
     };
 
     const transcribe = async (blob: Blob) => {
+      if (closedRef.current) return;
       if (blob.size < MIN_CLIP_BYTES) {
-        if (mode === 'once' && !closedRef.current) finish();
+        if (mode === 'once') finish();
         return;
       }
-      if (!closedRef.current) setStatus('transcribing');
+      // Only the one-shot flow is actually blocked on transcription. Continuous
+      // has already resumed recording by now, so showing "Transcribing…" there
+      // would freeze the wave while the mic is in fact live.
+      if (mode === 'once') setStatus('transcribing');
       try {
         const buf = await blob.arrayBuffer();
         const { text } = await bridge().voice.transcribe(buf, blob.type || 'audio/webm');
         if (text && !closedRef.current) onTranscript(text);
       } catch (e) {
-        if (!closedRef.current) {
-          setError(e instanceof Error ? e.message : 'Could not transcribe that.');
-          setStatus('error');
-        }
+        if (closedRef.current) return;
+        // Stop the whole session on failure. Continuous mode has already
+        // restarted the recorder, so without this a bad key or a dropped
+        // network would keep the mic hot and retry forever.
+        stopEverything();
+        setError(e instanceof Error ? e.message : 'Could not transcribe that.');
+        setStatus('error');
         return;
       }
       if (mode === 'once') finish();
@@ -120,7 +153,7 @@ export function VoiceOverlay({
         let sum = 0;
         for (let b = 0; b < BARS; b++) {
           let acc = 0;
-          for (let i = 0; i < band; i++) acc += data[b * band + i];
+          for (let i = 0; i < band; i++) acc += data[b * band + i] ?? 0;
           const v = acc / band / 255; // 0..1
           next.push(Math.max(0.12, Math.min(1, v * 1.6)));
           sum += v;
@@ -185,15 +218,7 @@ export function VoiceOverlay({
     }
     return () => {
       cancelled = true;
-      closedRef.current = true;
-      cancelAnimationFrame(rafRef.current);
-      try {
-        if (recorderRef.current && recorderRef.current.state !== 'inactive') recorderRef.current.stop();
-      } catch {
-        /* already stopped */
-      }
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-      void audioCtxRef.current?.close().catch(() => {});
+      stopEverything();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
@@ -229,7 +254,11 @@ export function VoiceOverlay({
             <span
               key={i}
               className="bb-wave-bar"
-              style={status === 'listening' ? { transform: `scaleY(${l.toFixed(3)})` } : undefined}
+              style={
+                status === 'listening' && !reduceMotion
+                  ? { transform: `scaleY(${l.toFixed(3)})` }
+                  : undefined
+              }
             />
           ))}
         </div>
@@ -243,7 +272,7 @@ export function VoiceOverlay({
             <span className="mb-1 flex items-center justify-center gap-1.5 text-primary">
               <span
                 className="h-1.5 w-1.5 rounded-full bg-primary"
-                style={{ animation: 'soft-pulse 1.4s ease-in-out infinite' }}
+                style={reduceMotion ? undefined : { animation: 'soft-pulse 1.4s ease-in-out infinite' }}
               />
               Voice Mode
             </span>

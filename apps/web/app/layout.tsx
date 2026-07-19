@@ -37,6 +37,11 @@ const CSP = [
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
+  // Kept so the intent travels with the policy, but note: browsers are
+  // REQUIRED to ignore frame-ancestors (along with sandbox and report-uri)
+  // when the policy is delivered via <meta http-equiv> — it only bites as a
+  // real HTTP response header. So this is not clickjacking protection today;
+  // that needs response headers from a CDN proxy in front of Pages.
   "frame-ancestors 'none'",
   'upgrade-insecure-requests',
 ].join('; ');

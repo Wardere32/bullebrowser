@@ -16,7 +16,7 @@
 // opened by a hamburger, so the two-panel feel is preserved on big screens and
 // degrades gracefully on small ones.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { product } from '@bullebrowser/brand-tokens';
@@ -82,8 +82,22 @@ export function SideNav() {
   const pathname = usePathname() || '/';
   const [open, setOpen] = useState(false);
 
-  const list = (
-    <nav className="flex flex-col gap-1 px-3">
+  // Escape closes the drawer — it's a modal overlay, and a keyboard user with
+  // no visible pointer target otherwise has no way out of it.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
+
+  // Both the desktop rail and the mobile drawer render this. Each passes its
+  // own label so assistive tech doesn't announce two indistinguishable
+  // "navigation" landmarks (the Header carries a third).
+  const list = (label: string) => (
+    <nav aria-label={label} className="flex flex-col gap-1 px-3">
       {ITEMS.map((it) => {
         const active = isActive(pathname, it.href);
         return (
@@ -140,7 +154,7 @@ export function SideNav() {
             <img src={asset('/wordmark.png')} alt={product.name} className="h-11 w-auto select-none" draggable={false} />
           </Link>
         </div>
-        <div className="mt-2 flex-1 overflow-y-auto pb-6">{list}</div>
+        <div className="mt-2 flex-1 overflow-y-auto pb-6">{list('Main')}</div>
         <div className="border-t border-line px-5 py-4 text-xs text-ink-secondary">
           <span className="inline-flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
@@ -151,7 +165,12 @@ export function SideNav() {
 
       {/* Mobile drawer + scrim. */}
       {open && (
-        <div className="fixed inset-0 z-40 lg:hidden">
+        <div
+          className="fixed inset-0 z-40 lg:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Navigation"
+        >
           <button
             type="button"
             aria-label="Close navigation"
@@ -175,7 +194,7 @@ export function SideNav() {
                 </svg>
               </button>
             </div>
-            <div className="mt-2 flex-1 overflow-y-auto pb-6">{list}</div>
+            <div className="mt-2 flex-1 overflow-y-auto pb-6">{list('Mobile')}</div>
           </div>
         </div>
       )}

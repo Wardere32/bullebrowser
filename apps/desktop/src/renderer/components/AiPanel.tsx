@@ -45,6 +45,9 @@ const MODELS = ASSISTANTS;
 export function AiPanel() {
   const current = useAgentStore((s) => s.current);
   const setCurrent = useAgentStore((s) => s.setCurrent);
+  // The history list renders from this; without the selector the identifier is
+  // simply undefined and opening History throws.
+  const conversations = useAgentStore((s) => s.conversations);
   const setConversations = useAgentStore((s) => s.setConversations);
   const startRun = useAgentStore((s) => s.startRun);
   const status = useAgentStore((s) => s.status);
@@ -75,6 +78,9 @@ export function AiPanel() {
   // jump back down.
   const messagesRef = useRef<HTMLDivElement>(null);
   const [atBottom, setAtBottom] = useState(true);
+  // Held while a queued task is being dispatched, so the drain effect starts
+  // exactly one run at a time (see the drain effect below).
+  const drainingRef = useRef(false);
   const onMessagesScroll = () => {
     const el = messagesRef.current;
     if (!el) return;
@@ -165,10 +171,18 @@ export function AiPanel() {
   // start the next task. sendMessage flips status back to running, so this
   // won't double-fire until the next task finishes.
   useEffect(() => {
-    if (status !== 'idle' || queued.length === 0 || !current) return;
+    // `status` only flips to 'running' once agent.run() resolves. Without a
+    // synchronous guard this effect re-fires the moment setQueued changes the
+    // list — status is still 'idle' — and dispatches the whole queue at once
+    // instead of one task after another.
+    if (status !== 'idle' || queued.length === 0 || !current || drainingRef.current) return;
     const [next, ...rest] = queued;
+    if (!next) return;
+    drainingRef.current = true;
     setQueued(rest);
-    void sendMessage(next.text, next.attachments);
+    void sendMessage(next.text, next.attachments).finally(() => {
+      drainingRef.current = false;
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, queued, current]);
 
@@ -458,7 +472,12 @@ export function AiPanel() {
                 key={i}
                 className="flex items-center gap-2 rounded-md bg-surface-muted/60 px-2 py-1 text-[11px] text-ink-secondary"
               >
-                <span className="flex-1 truncate">{q}</span>
+                <span className="flex-1 truncate">{q.text}</span>
+                {q.attachments.length > 0 && (
+                  <span className="shrink-0 text-[10px] text-ink-secondary">
+                    +{q.attachments.length}
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={() => setQueued((list) => list.filter((_, j) => j !== i))}
