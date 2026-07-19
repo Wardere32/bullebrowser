@@ -75,6 +75,48 @@ pnpm --filter @bullebrowser/desktop test         # unit tests
 pnpm --filter @bullebrowser/desktop build        # electron-vite bundle
 ```
 
-All pass. Note: a GUI/mic smoke test (record → transcribe → send; upload → the
-agent references the file; screenshot attach; jump-to-latest) must be done in a
-running build — it can't be exercised headlessly.
+All pass.
+
+### The typecheck used to check nothing
+
+`apps/desktop/tsconfig.json` is a *solution* file — `{"files": [], "references":
+[...]}` — so `tsc --noEmit -p tsconfig.json` compiled **zero files** and always
+exited 0. Real type errors (including a live crash) shipped undetected behind a
+green check. The `typecheck` script now runs `tsconfig.node.json` and
+`tsconfig.web.json` explicitly. If a desktop typecheck ever looks suspiciously
+easy, confirm what it actually compiles (`tsc -p … --listFiles | wc -l`).
+
+### What the unit tests cover
+
+The logic that can't be driven headlessly is covered directly instead:
+
+- `main/agent/attachments.test.ts` — the prompt appendix: inlining text files,
+  describing binaries, expanding projects, skipping swept files, and the
+  untrusted-data framing (a file containing "ignore all previous instructions"
+  must still arrive labelled as inert data, *after* the warning).
+- `main/storage/session-files.test.ts` — the 8-day sweep against a real temp
+  filesystem (metadata *and* bytes), dotfile classification, excerpt capping,
+  and the UUID guard that stops a renderer-supplied id from deleting an
+  arbitrary file.
+- `main/storage/projects.test.ts` — de-duping, missing-project guards, and
+  read-side reconciliation of file counts against expired files.
+- `main/voice.test.ts` — the transcription contract: bearer auth, empty-clip
+  short-circuit, the no-key path (must not call out), 401 mapping, provider
+  error messages, and non-JSON error bodies.
+
+### Still not covered: the GUI
+
+The Playwright Electron harness (`e2e/`) **cannot launch on this toolchain**:
+Playwright passes `--remote-debugging-port=0` ahead of the app path, where
+Electron 39 parses it as a Node flag and dies with `bad option`. Bumping
+Playwright to 1.61.1 does not fix it. Separately, all three specs assert UI copy
+that no longer exists ("Running in local-first mode.", "Open Settings", the old
+key-validation string) — they rotted in earlier commits. So the e2e job is red
+for reasons that predate this work, and these remain unverified end-to-end:
+
+- record → transcribe → send, and continuous Voice Mode segmentation
+- the file picker and screenshot capture round-trip
+- jump-to-latest and the attachment chips under real interaction
+
+Fixing e2e means resolving the Playwright/Electron incompatibility and
+rewriting the stale assertions — worth doing, but it is its own task.
