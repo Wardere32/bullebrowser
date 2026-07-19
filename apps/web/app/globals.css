@@ -5,11 +5,89 @@
 :root {
   --color-primary: #2563eb;
   --color-accent: #f59e0b;
+  /* Width of the persistent left rail on desktop. Consumed by the shell
+     grid in layout.tsx via Tailwind's arbitrary-value syntax and kept here
+     as the single source of truth. */
+  --sidenav-width: 15rem;
 }
 
 html {
   font-family: var(--font-inter), system-ui, sans-serif;
   scroll-behavior: smooth;
+}
+
+/* ---------------------------------------------------------------------------
+   Halo effect — a gentle conic glow that circles the chat composer while the
+   user is focused in it or the agent is actively typing. It rides on a
+   ::before pseudo-element behind the box so it never intercepts clicks, and
+   fades/animates in only when the parent carries `.is-active`. Honors
+   prefers-reduced-motion by holding a static glow instead of rotating.
+--------------------------------------------------------------------------- */
+@property --halo-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.halo {
+  position: relative;
+}
+.halo::before {
+  content: '';
+  position: absolute;
+  inset: -1.5px;
+  border-radius: inherit;
+  padding: 1.5px; /* the ring thickness */
+  background: conic-gradient(
+    from var(--halo-angle),
+    transparent 0deg,
+    var(--color-primary) 90deg,
+    var(--color-accent) 180deg,
+    var(--color-primary) 270deg,
+    transparent 360deg
+  );
+  /* Mask so only the padding box (the ring) shows, not the fill. */
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+}
+.halo.is-active::before,
+.halo:focus-within::before {
+  opacity: 1;
+  animation: halo-spin 4s linear infinite;
+}
+@keyframes halo-spin {
+  to {
+    --halo-angle: 360deg;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .halo.is-active::before,
+  .halo:focus-within::before {
+    animation: none;
+    opacity: 0.7;
+  }
+}
+
+/* Soft breathing dot / pulse used for "listening"/"working" indicators. */
+@keyframes soft-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.82);
+  }
 }
 
 .prose-lite {

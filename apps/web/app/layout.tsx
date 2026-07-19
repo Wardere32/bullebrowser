@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono } from 'next/font/google';
 import { product } from '@bullebrowser/brand-tokens';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
+import { SideNav } from '@/components/SideNav';
 import './globals.css';
 
 const inter = Inter({
@@ -64,10 +65,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* http-equiv (not name) — this is what browsers actually enforce. */}
         <meta httpEquiv="Content-Security-Policy" content={CSP} />
       </head>
-      <body className="flex min-h-screen flex-col bg-surface-light text-ink-primary antialiased">
-        <Header />
-        <main className="flex-1">{children}</main>
-        <Footer />
+      <body className="bg-surface-light text-ink-primary antialiased">
+        {/* Two-panel shell: a fixed left rail (Comet-style navigation) and a
+            main column offset by the rail's width on desktop. Below `lg` the
+            rail collapses into a drawer and the column spans full width. */}
+        <SideNav />
+        <div className="flex min-h-screen flex-col lg:pl-[var(--sidenav-width)]">
+          <Header />
+          <main className="flex-1">{children}</main>
+          <Footer />
+        </div>
       </body>
     </html>
   );
