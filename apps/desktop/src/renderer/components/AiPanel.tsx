@@ -1,13 +1,38 @@
 import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { product } from '@bullebrowser/brand-tokens';
 import { skills, ASSISTANTS, providerFor, type ModelId } from '@bullebrowser/agent-core';
 import { useAgentStore } from '../state/agent-store.js';
 import { AGENT_PROMPT_EVENT } from '../lib/url.js';
 import { expandSlashCommand, SLASH_COMMANDS } from '../lib/slash-commands.js';
 import { useInputActivity } from '../hooks/useInputActivity.js';
-import type { AppSettings, ConversationSummary } from '../../shared/ipc.js';
+import { VoiceOverlay } from './VoiceOverlay.js';
+import { AttachMenu, type UiAttachment } from './AttachMenu.js';
+import type {
+  AppSettings,
+  ConversationSummary,
+  RunAttachment,
+} from '../../shared/ipc.js';
 import type { AgentStepEvent } from '../../shared/agent-events.js';
+
+// A task waiting behind the running one, carrying whatever was attached when it
+// was queued so its context isn't lost by the time it runs.
+interface QueuedTask {
+  text: string;
+  attachments: UiAttachment[];
+}
+
+// UI attachment references → the wire shape the agent run accepts.
+function toRunAttachments(list: UiAttachment[]): RunAttachment[] {
+  return list.map((a) =>
+    a.kind === 'file'
+      ? { kind: 'file', fileId: a.fileId, name: a.name }
+      : a.kind === 'project'
+        ? { kind: 'project', projectId: a.projectId, name: a.name }
+        : { kind: 'screenshot', url: a.url },
+  );
+}
 
 export const FOCUS_AI_PANEL_EVENT = 'bullebrowser:focus-ai-panel';
 
@@ -29,7 +54,12 @@ export function AiPanel() {
   const [draft, setDraft] = useState('');
   // Tasks the user submitted while a run was already going. They run one after
   // another as each finishes, so the user can queue up work instead of waiting.
-  const [queued, setQueued] = useState<string[]>([]);
+  const [queued, setQueued] = useState<QueuedTask[]>([]);
+  // Context attached to the NEXT message via the "+" menu (files, a project, a
+  // screenshot). Cleared when that message is sent or queued.
+  const [attachments, setAttachments] = useState<UiAttachment[]>([]);
+  // Voice input overlay: null when off, otherwise the active mode.
+  const [voiceMode, setVoiceMode] = useState<'once' | 'continuous' | null>(null);
   const [skillId, setSkillId] = useState<string>('');
   const [model, setModel] = useState<ModelId>('claude-opus-4-7');
   // null = not checked yet, so we render neither the chat nor the connect
@@ -39,6 +69,21 @@ export function AiPanel() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const runInProgress = status === 'running';
   const promptActivity = useInputActivity();
+
+  // Conversation scroll: keep the newest message in view as the agent streams,
+  // unless the user has scrolled up to read — then a pointer button appears to
+  // jump back down.
+  const messagesRef = useRef<HTMLDivElement>(null);
+  const [atBottom, setAtBottom] = useState(true);
+  const onMessagesScroll = () => {
+    const el = messagesRef.current;
+    if (!el) return;
+    setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 32);
+  };
+  const jumpToLatest = () => {
+    const el = messagesRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  };
 
   useEffect(() => {
     void (async () => {
@@ -58,7 +103,7 @@ export function AiPanel() {
     })();
   }, [setConversations, setCurrent]);
 
-  const sendMessage = async (text: string) => {
+  const sendMessage = async (text: string, atts: UiAttachment[] = []) => {
     const raw = text.trim();
     if (!raw || !current) return;
     // Slash commands expand client-side into a fully formed agent prompt so
@@ -89,11 +134,13 @@ export function AiPanel() {
     });
     const bridge = browserBridge();
     const skill = skillId || undefined;
+    const runAttachments = atts.length > 0 ? toRunAttachments(atts) : undefined;
     const { runId } = await bridge.agent.run({
       conversationId: current.id,
       userMessage: message,
       model,
       ...(skill ? { skillId: skill } : {}),
+      ...(runAttachments ? { attachments: runAttachments } : {}),
     });
     startRun(runId);
   };
@@ -101,15 +148,17 @@ export function AiPanel() {
   const send = async () => {
     const t = draft.trim();
     if (!t) return;
+    const atts = attachments;
     setDraft('');
+    setAttachments([]);
     promptActivity.reset();
-    // Busy? Queue it. It'll run when the current task (and anything ahead of it
-    // in the queue) finishes. Otherwise start it now.
+    // Busy? Queue it (with its attachments). It'll run when the current task
+    // (and anything ahead of it) finishes. Otherwise start it now.
     if (runInProgress || queued.length > 0) {
-      setQueued((q) => [...q, t]);
+      setQueued((q) => [...q, { text: t, attachments: atts }]);
       return;
     }
-    await sendMessage(t);
+    await sendMessage(t, atts);
   };
 
   // Drain the queue: whenever the agent goes idle and something is waiting,
@@ -119,9 +168,34 @@ export function AiPanel() {
     if (status !== 'idle' || queued.length === 0 || !current) return;
     const [next, ...rest] = queued;
     setQueued(rest);
-    void sendMessage(next);
+    void sendMessage(next.text, next.attachments);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, queued, current]);
+
+  // A transcript from the voice overlay arrives as a finished prompt: fill the
+  // composer and send it straight away (one-shot closes the overlay; continuous
+  // stays listening for the next command).
+  const onVoiceTranscript = (text: string) => {
+    const t = text.trim();
+    if (!t) return;
+    void sendMessage(t, attachments);
+    setAttachments([]);
+    setDraft('');
+  };
+
+  // "Control Browser": give the agent a live tab to drive if there isn't one,
+  // and focus the composer so the user can say what to do.
+  const controlBrowser = async () => {
+    const bridge = browserBridge();
+    const tabs = await bridge.tabs.list();
+    if (!tabs || tabs.length === 0) await bridge.tabs.create();
+    textareaRef.current?.focus();
+  };
+
+  // Open bullebrowser.com in a new tab — the brand-mark "home" affordance.
+  const openHome = () => {
+    void browserBridge().tabs.create(`https://${product.domain}`);
+  };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -196,6 +270,13 @@ export function AiPanel() {
       .then((present: boolean) => setHasKey(present));
   }, [status, currentStep, model]);
 
+  // Follow the conversation as it grows / streams, but only when already
+  // pinned to the bottom, so scrolling up to re-read isn't yanked back down.
+  useEffect(() => {
+    const el = messagesRef.current;
+    if (el && atBottom) el.scrollTop = el.scrollHeight;
+  }, [current?.messages, steps, status, atBottom]);
+
   const createConversation = async () => {
     const bridge = browserBridge();
     const c = await bridge.conversations.create();
@@ -224,7 +305,14 @@ export function AiPanel() {
   };
 
   return (
-    <aside className="flex w-[440px] flex-col border-l border-line/25 bg-surface-light">
+    <aside className="relative flex w-[440px] flex-col border-l border-line/25 bg-surface-light">
+      {voiceMode && (
+        <VoiceOverlay
+          mode={voiceMode}
+          onTranscript={onVoiceTranscript}
+          onClose={() => setVoiceMode(null)}
+        />
+      )}
       <header className="flex items-center justify-between gap-2 px-4 py-3">
         <div className="text-[13px] font-semibold tracking-tight text-ink-primary">
           BulleBrowser Agent
@@ -288,7 +376,12 @@ export function AiPanel() {
         </select>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-5 py-5">
+      <div className="relative flex flex-1 flex-col overflow-hidden">
+      <div
+        ref={messagesRef}
+        onScroll={onMessagesScroll}
+        className="flex-1 overflow-y-auto px-5 py-5"
+      >
         {hasKey === false && <ConnectKey model={model} onConnected={() => setHasKey(true)} />}
         {hasKey === true && current && current.messages.length === 0 && (
           <EmptyState />
@@ -299,6 +392,22 @@ export function AiPanel() {
           ))}
         {hasKey === true && (status === 'running' || status === 'error') && (
           <ActivityFeed steps={steps} status={status} currentStep={currentStep} />
+        )}
+      </div>
+
+        {/* Pointer arrow → jump to the latest message. Shown only when the
+            user has scrolled up, so it never covers the newest reply. */}
+        {!atBottom && (
+          <button
+            type="button"
+            onClick={jumpToLatest}
+            aria-label="Jump to latest message"
+            className="absolute bottom-3 right-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-line bg-white text-ink-primary shadow-md transition-transform hover:scale-105"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5v14M6 13l6 6 6-6" />
+            </svg>
+          </button>
         )}
       </div>
 
@@ -359,6 +468,33 @@ export function AiPanel() {
                   ✕
                 </button>
               </div>
+            ))}
+          </div>
+        )}
+        {attachments.length > 0 && (
+          <div className="mb-1.5 flex flex-wrap gap-1.5">
+            {attachments.map((a, i) => (
+              <span
+                key={i}
+                className="inline-flex items-center gap-1.5 rounded-md border border-line bg-surface-muted/60 py-1 pl-1.5 pr-1 text-[11px] text-ink-primary"
+              >
+                {a.kind === 'screenshot' ? (
+                  <img src={a.thumb} alt="" className="h-4 w-6 rounded object-cover" />
+                ) : (
+                  <span className="text-primary">{a.kind === 'project' ? '▣' : '📄'}</span>
+                )}
+                <span className="max-w-[150px] truncate">
+                  {a.kind === 'project' ? `Project: ${a.name}` : a.kind === 'screenshot' ? 'Screenshot' : a.name}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setAttachments((list) => list.filter((_, j) => j !== i))}
+                  className="ml-0.5 rounded px-1 text-ink-secondary hover:text-danger"
+                  title="Remove attachment"
+                >
+                  ✕
+                </button>
+              </span>
             ))}
           </div>
         )}
@@ -424,6 +560,59 @@ export function AiPanel() {
               {runInProgress ? 'Queue' : 'Send'}
             </button>
           </div>
+        </div>
+
+        {/* Control row: "+" attachment menu, brand-mark home, one-shot mic,
+            and the continuous Voice Mode toggle. */}
+        <div className="mt-2 flex items-center gap-1">
+          <AttachMenu
+            onAttach={(a) => setAttachments((list) => [...list, a])}
+            onControlBrowser={() => void controlBrowser()}
+          />
+
+          <button
+            type="button"
+            onClick={openHome}
+            aria-label="Open bullebrowser.com"
+            title="bullebrowser.com"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-muted"
+          >
+            <svg viewBox="0 0 64 64" className="h-5 w-5" aria-hidden>
+              <rect x="4" y="4" width="56" height="56" rx="16" fill="#2563EB" />
+              <circle cx="26" cy="30" r="12" fill="none" stroke="#fff" strokeWidth="5" />
+              <circle cx="42" cy="40" r="6" fill="#fff" />
+            </svg>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setVoiceMode('once')}
+            aria-label="Voice input"
+            title="Speak a prompt"
+            className={`inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
+              voiceMode === 'once' ? 'bg-primary/10 text-primary' : 'text-ink-secondary hover:bg-surface-muted hover:text-ink-primary'
+            }`}
+          >
+            <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+              <rect x="9" y="3" width="6" height="11" rx="3" />
+              <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+            </svg>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setVoiceMode((v) => (v === 'continuous' ? null : 'continuous'))}
+            aria-label="Voice Mode"
+            aria-pressed={voiceMode === 'continuous'}
+            title="Continuous Voice Mode"
+            className={`inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
+              voiceMode === 'continuous' ? 'bg-primary/10 text-primary' : 'text-ink-secondary hover:bg-surface-muted hover:text-ink-primary'
+            }`}
+          >
+            <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round">
+              <path d="M4 11v2M8 8v8M12 5v14M16 8v8M20 11v2" />
+            </svg>
+          </button>
         </div>
           </>
         )}

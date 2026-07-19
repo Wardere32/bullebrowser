@@ -12,9 +12,16 @@ import {
   type AgentStep,
   type ToolContext,
 } from '@bullebrowser/agent-core';
-import { IPC, type AgentConfirmRequest, type AgentRunRequest } from '../../shared/ipc.js';
+import {
+  IPC,
+  type AgentConfirmRequest,
+  type AgentRunRequest,
+  type RunAttachment,
+} from '../../shared/ipc.js';
 import type { AgentStepEvent } from '../../shared/agent-events.js';
 import { conversationStore } from '../storage/conversations.js';
+import { sessionFileStore } from '../storage/session-files.js';
+import { projectStore } from '../storage/projects.js';
 import { tabManager } from '../tabs/manager.js';
 import { getApiKey } from '../storage/secrets.js';
 import { getSettings } from '../storage/settings.js';
@@ -88,12 +95,18 @@ export async function startAgentRun(
   const conversation = conversationStore.get(req.conversationId);
   if (!conversation) throw new Error('Conversation not found');
 
+  // Store the user's message CLEAN (what they typed), but hand the model an
+  // enriched version that folds in any attached file/project/screenshot
+  // context. This keeps the visible chat uncluttered while the agent still sees
+  // everything, and needs no change to agent-core: the enrichment is just text
+  // appended to the one message we send this run.
   const userMsg = {
     role: 'user' as const,
     content: req.userMessage,
     timestamp: Date.now(),
   };
   conversationStore.appendMessage(req.conversationId, userMsg);
+  const composedMessage = req.userMessage + buildAttachmentAppendix(req.attachments);
 
   const runId = randomUUID();
   const controller = new AbortController();
@@ -161,7 +174,7 @@ export async function startAgentRun(
         history: conversation.messages
           .filter((m) => m !== userMsg)
           .map((m) => ({ role: m.role, content: m.content })),
-        userMessage: req.userMessage,
+        userMessage: composedMessage,
         context: ctx,
         requestBrowseAccess: () => ask(req.userMessage, 'browse_access'),
         onStep: (step) => {
@@ -208,6 +221,56 @@ export async function startAgentRun(
   })();
 
   return { runId };
+}
+
+// Fold attached context (files, a project, a screenshot) into a Markdown
+// appendix on the user's message. Content is resolved here from the stores by
+// id, so the renderer only ever ships small references. Returns '' when nothing
+// is attached, so an ordinary run is byte-for-byte unchanged.
+function buildAttachmentAppendix(attachments?: RunAttachment[]): string {
+  if (!attachments || attachments.length === 0) return '';
+  const parts: string[] = [];
+
+  for (const a of attachments) {
+    if (a.kind === 'file') {
+      const meta = sessionFileStore.get(a.fileId);
+      if (!meta) continue;
+      const excerpt = sessionFileStore.excerpt(a.fileId);
+      parts.push(
+        excerpt
+          ? `### Attached file: ${meta.name}\n\n${excerpt}`
+          : `### Attached file: ${meta.name} (${meta.mime}, ${fmtBytes(meta.sizeBytes)}) — binary; contents not shown inline.`,
+      );
+    } else if (a.kind === 'project') {
+      const project = projectStore.get(a.projectId);
+      if (!project) continue;
+      const lines = [`### Project: ${project.name}`];
+      if (project.instructions.trim()) {
+        lines.push(`Standing instructions for this project:\n${project.instructions.trim()}`);
+      }
+      for (const fid of project.fileIds) {
+        const meta = sessionFileStore.get(fid);
+        if (!meta) continue;
+        const excerpt = sessionFileStore.excerpt(fid);
+        lines.push(excerpt ? `#### ${meta.name}\n\n${excerpt}` : `#### ${meta.name} (binary)`);
+      }
+      parts.push(lines.join('\n\n'));
+    } else if (a.kind === 'screenshot') {
+      parts.push(
+        `### Attached screenshot\nThe user attached a screenshot of the current page (${a.url}). ` +
+          'If a visual check would help, use the screenshot tool on the active tab to see it.',
+      );
+    }
+  }
+
+  if (parts.length === 0) return '';
+  return `\n\n---\nThe user attached the following context to this task:\n\n${parts.join('\n\n')}`;
+}
+
+function fmtBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 // True when a run ended because the user pressed Stop, rather than a real
