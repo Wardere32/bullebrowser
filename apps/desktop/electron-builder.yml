@@ -30,6 +30,12 @@ asarUnpack:
 mac:
   category: public.app-category.productivity
   hardenedRuntime: true
+  # Drives the macOS microphone-consent prompt for Voice input / Voice Mode.
+  # Paired with com.apple.security.device.audio-input in the entitlements.
+  extendInfo:
+    NSMicrophoneUsageDescription: >-
+      BulleBrowser uses the microphone only while you use voice input, to
+      transcribe what you say into a prompt for the agent.
   # We run our own spctl/stapler Gatekeeper check after notarization (a signed
   # but not-yet-notarized app fails spctl, so an in-pack assess would break the
   # build before notarization even runs). See scripts/notarize.cjs.

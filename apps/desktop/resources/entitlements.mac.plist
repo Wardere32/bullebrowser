@@ -13,5 +13,12 @@
     <true/>
     <key>com.apple.security.network.client</key>
     <true/>
+    <!-- Voice input: the AI panel records the mic for one-shot and continuous
+         Voice Mode (transcribed via the user's OpenAI key). Under the hardened
+         runtime this entitlement is required for getUserMedia to reach the
+         microphone; the NSMicrophoneUsageDescription string (see
+         electron-builder.yml → mac.extendInfo) drives the OS consent prompt. -->
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
   </dict>
 </plist>

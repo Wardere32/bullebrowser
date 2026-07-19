@@ -1,4 +1,4 @@
-import { app, type BrowserWindow, ipcMain, shell } from 'electron';
+import { app, type BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import type { ProviderId } from '@bullebrowser/agent-core';
 import { getUpdateStatus, quitAndInstallUpdate } from './updater.js';
 import { readFileSync } from 'node:fs';
@@ -18,6 +18,9 @@ import { historyStore } from './storage/history.js';
 import { bookmarkStore } from './storage/bookmarks.js';
 import { getSettings, setSettings } from './storage/settings.js';
 import { conversationStore } from './storage/conversations.js';
+import { sessionFileStore } from './storage/session-files.js';
+import { projectStore } from './storage/projects.js';
+import { transcribeAudio } from './voice.js';
 import {
   clearApiKey,
   hasApiKey,
@@ -80,6 +83,46 @@ export function registerIpc(win: BrowserWindow) {
     IPC.AGENT_CONFIRM_REPLY,
     (_e, runId: string, id: string, approved: boolean) =>
       replyAgentConfirm(runId, id, approved),
+  );
+  // Screenshot the active tab for a composer attachment. Reuses the same
+  // capturePage the agent's screenshot tool uses.
+  ipcMain.handle(IPC.AGENT_CAPTURE, async () => {
+    const id = tabManager.getActiveId();
+    const view = id ? tabManager.getView(id) : null;
+    if (!view) return null;
+    const image = await view.webContents.capturePage();
+    return { pngBase64: image.toPNG().toString('base64'), url: view.webContents.getURL() };
+  });
+
+  // session files
+  ipcMain.handle(IPC.FILE_PICK, async () => {
+    const result = await dialog.showOpenDialog(win, {
+      title: 'Attach files',
+      properties: ['openFile', 'multiSelections'],
+    });
+    if (result.canceled || result.filePaths.length === 0) return [];
+    return sessionFileStore.add(result.filePaths);
+  });
+  ipcMain.handle(IPC.FILE_LIST, () => sessionFileStore.list());
+  ipcMain.handle(IPC.FILE_REMOVE, (_e, id: string) => sessionFileStore.remove(id));
+
+  // projects
+  ipcMain.handle(IPC.PROJECT_LIST, () => projectStore.list());
+  ipcMain.handle(IPC.PROJECT_GET, (_e, id: string) => projectStore.get(id));
+  ipcMain.handle(IPC.PROJECT_CREATE, (_e, name: string) => projectStore.create(name));
+  ipcMain.handle(
+    IPC.PROJECT_UPDATE,
+    (_e, id: string, patch: { name?: string; instructions?: string }) =>
+      projectStore.update(id, patch),
+  );
+  ipcMain.handle(IPC.PROJECT_ATTACH_FILES, (_e, id: string, fileIds: string[]) =>
+    projectStore.attachFiles(id, fileIds),
+  );
+  ipcMain.handle(IPC.PROJECT_DELETE, (_e, id: string) => projectStore.delete(id));
+
+  // voice → transcription (OpenAI Whisper, user's key)
+  ipcMain.handle(IPC.VOICE_TRANSCRIBE, (_e, audio: ArrayBuffer, mime: string) =>
+    transcribeAudio(audio, mime),
   );
 
   // app info

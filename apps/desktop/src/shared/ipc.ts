@@ -37,6 +37,18 @@ export const IPC = {
   AGENT_STEP: 'agent:step', // main → renderer stream
   AGENT_CONFIRM_REQUEST: 'agent:confirm-request', // main → renderer
   AGENT_CONFIRM_REPLY: 'agent:confirm-reply',
+  AGENT_CAPTURE: 'agent:capture', // screenshot the active tab for an attachment
+  // Attachments — session files, projects, voice
+  FILE_PICK: 'file:pick',
+  FILE_LIST: 'file:list',
+  FILE_REMOVE: 'file:remove',
+  PROJECT_LIST: 'project:list',
+  PROJECT_GET: 'project:get',
+  PROJECT_CREATE: 'project:create',
+  PROJECT_UPDATE: 'project:update',
+  PROJECT_ATTACH_FILES: 'project:attach-files',
+  PROJECT_DELETE: 'project:delete',
+  VOICE_TRANSCRIBE: 'voice:transcribe',
   // Conversations
   CONVERSATION_LIST: 'conversation:list',
   CONVERSATION_GET: 'conversation:get',
@@ -135,11 +147,53 @@ export interface ConversationDetail extends ConversationSummary {
   messages: { role: 'user' | 'assistant'; content: string; timestamp: number }[];
 }
 
+// A file the user uploaded into the current session. Bytes live under
+// userData/session-files; this is the metadata the UI and agent see. Files are
+// swept 8 days after upload — retention is enforced in the store, and
+// `expiresAt` is surfaced so the UI can say so.
+export interface SessionFile {
+  id: string;
+  name: string;
+  mime: string;
+  sizeBytes: number;
+  addedAt: number;
+  expiresAt: number; // addedAt + 8 days
+  // Whether we could read it as text for agent context. Binary files (images,
+  // archives) still upload and attach, but carry no inline excerpt.
+  isText: boolean;
+}
+
+export interface ProjectSummary {
+  id: string;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+  fileCount: number;
+}
+
+export interface ProjectDetail extends ProjectSummary {
+  // Standing instructions the agent should treat as always-on context for any
+  // task run "in" this project.
+  instructions: string;
+  fileIds: string[];
+}
+
+// What the user attached to a single run. The renderer sends only references
+// (ids/urls); main resolves the actual content when it enriches the prompt, so
+// large file text never rides the IPC round-trip twice.
+export type RunAttachment =
+  | { kind: 'file'; fileId: string; name: string }
+  | { kind: 'project'; projectId: string; name: string }
+  | { kind: 'screenshot'; url: string };
+
 export interface AgentRunRequest {
   conversationId: string;
   userMessage: string;
   model: ModelId;
   skillId?: string;
+  // Optional context the user attached via the "+" menu. Additive: an empty or
+  // absent list runs exactly as before.
+  attachments?: RunAttachment[];
 }
 
 export interface AppInfo {
@@ -200,6 +254,28 @@ export interface BrowserBridge {
     ): () => void;
     onConfirmRequest(cb: (event: AgentConfirmRequest) => void): () => void;
     replyConfirm(runId: string, id: string, approved: boolean): Promise<void>;
+    // Capture the active tab as a PNG so the composer can show a thumbnail and
+    // attach it to the next run. Null when there's no capturable tab.
+    captureScreenshot(): Promise<{ pngBase64: string; url: string } | null>;
+  };
+  files: {
+    // Opens a native file picker; returns the files added to the session.
+    pick(): Promise<SessionFile[]>;
+    list(): Promise<SessionFile[]>;
+    remove(id: string): Promise<void>;
+  };
+  projects: {
+    list(): Promise<ProjectSummary[]>;
+    get(id: string): Promise<ProjectDetail | null>;
+    create(name: string): Promise<ProjectDetail>;
+    update(id: string, patch: { name?: string; instructions?: string }): Promise<ProjectDetail | null>;
+    attachFiles(id: string, fileIds: string[]): Promise<ProjectDetail | null>;
+    delete(id: string): Promise<void>;
+  };
+  voice: {
+    // Transcribe one recorded clip via the user's OpenAI key (Whisper). The
+    // audio rides as raw bytes; mime is the recorder's container type.
+    transcribe(audio: ArrayBuffer, mime: string): Promise<{ text: string }>;
   };
   app: {
     info(): Promise<AppInfo>;

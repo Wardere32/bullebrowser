@@ -62,6 +62,23 @@ const bridge: BrowserBridge = {
     onConfirmRequest: (cb) => subscribe(IPC.AGENT_CONFIRM_REQUEST, cb),
     replyConfirm: (runId, id, approved) =>
       ipcRenderer.invoke(IPC.AGENT_CONFIRM_REPLY, runId, id, approved),
+    captureScreenshot: () => ipcRenderer.invoke(IPC.AGENT_CAPTURE),
+  },
+  files: {
+    pick: () => ipcRenderer.invoke(IPC.FILE_PICK),
+    list: () => ipcRenderer.invoke(IPC.FILE_LIST),
+    remove: (id) => ipcRenderer.invoke(IPC.FILE_REMOVE, id),
+  },
+  projects: {
+    list: () => ipcRenderer.invoke(IPC.PROJECT_LIST),
+    get: (id) => ipcRenderer.invoke(IPC.PROJECT_GET, id),
+    create: (name) => ipcRenderer.invoke(IPC.PROJECT_CREATE, name),
+    update: (id, patch) => ipcRenderer.invoke(IPC.PROJECT_UPDATE, id, patch),
+    attachFiles: (id, fileIds) => ipcRenderer.invoke(IPC.PROJECT_ATTACH_FILES, id, fileIds),
+    delete: (id) => ipcRenderer.invoke(IPC.PROJECT_DELETE, id),
+  },
+  voice: {
+    transcribe: (audio, mime) => ipcRenderer.invoke(IPC.VOICE_TRANSCRIBE, audio, mime),
   },
   updates: {
     status: () => ipcRenderer.invoke(IPC.UPDATE_GET_STATUS),
