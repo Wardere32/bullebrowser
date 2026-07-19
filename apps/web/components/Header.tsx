@@ -4,7 +4,7 @@ import { product } from '@bullebrowser/brand-tokens';
 import { asset } from '@/lib/asset';
 
 // The top bar of the main column. It sits to the RIGHT of the fixed left rail
-// on desktop, so the wordmark here only appears below `lg` (where the rail is
+// on desktop, so the wordmark here only appears below `xl` (where the rail is
 // a hidden drawer and the logo would otherwise vanish). On desktop the bar
 // carries the secondary links and the primary Download CTA; the rail owns the
 // brand mark. The bar is taller (h-16) and the logo larger (h-11) than before,
@@ -17,7 +17,7 @@ export function Header() {
         <Link
           href="/"
           aria-label={product.name}
-          className="flex items-center pl-11 lg:hidden"
+          className="flex items-center pl-11 xl:hidden"
         >
           <img
             src={asset('/wordmark.png')}
@@ -28,7 +28,7 @@ export function Header() {
         </Link>
 
         {/* Desktop spacer keeps the CTA cluster right-aligned. */}
-        <div className="hidden lg:block" />
+        <div className="hidden xl:block" />
 
         <nav className="flex items-center gap-4 text-sm sm:gap-6">
           <Link href="/features" className="hidden text-ink-secondary hover:text-ink-primary sm:inline">

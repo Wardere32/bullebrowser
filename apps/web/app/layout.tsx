@@ -72,10 +72,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="bg-surface-light text-ink-primary antialiased">
         {/* Two-panel shell: a fixed left rail (Comet-style navigation) and a
-            main column offset by the rail's width on desktop. Below `lg` the
-            rail collapses into a drawer and the column spans full width. */}
+            main column offset by the rail's width on desktop. Below `xl` the
+            rail collapses into a drawer and the column spans full width.
+            The rail waits for `xl` on purpose: the hero goes two-column at
+            `md`, so turning the rail on any earlier made the content column
+            visibly *narrower* as the window got wider. */}
         <SideNav />
-        <div className="flex min-h-screen flex-col lg:pl-[var(--sidenav-width)]">
+        <div className="flex min-h-screen flex-col xl:pl-[var(--sidenav-width)]">
           <Header />
           <main className="flex-1">{children}</main>
           <Footer />

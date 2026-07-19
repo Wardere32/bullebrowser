@@ -12,7 +12,7 @@
 //   Account & Settings→ /download    (get / manage the desktop app)
 //   Help & Support    → /about       (who's behind it + contact)
 //
-// On desktop it's a fixed rail; below `lg` it collapses to a slide-over drawer
+// On desktop it's a fixed rail; below `xl` it collapses to a slide-over drawer
 // opened by a hamburger, so the two-panel feel is preserved on big screens and
 // degrades gracefully on small ones.
 
@@ -134,12 +134,12 @@ export function SideNav() {
 
   return (
     <>
-      {/* Mobile: hamburger, fixed at the top-left, only below lg. */}
+      {/* Mobile: hamburger, fixed at the top-left, only below xl. */}
       <button
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Open navigation"
-        className="fixed left-3 top-3 z-40 inline-flex h-9 w-9 items-center justify-center rounded-md border border-line bg-surface-light/90 text-ink-primary backdrop-blur lg:hidden"
+        className="fixed left-3 top-3 z-40 inline-flex h-9 w-9 items-center justify-center rounded-md border border-line bg-surface-light/90 text-ink-primary backdrop-blur xl:hidden"
       >
         <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round">
           <path d="M4 7h16M4 12h16M4 17h16" />
@@ -147,7 +147,7 @@ export function SideNav() {
       </button>
 
       {/* Desktop: fixed rail. */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[var(--sidenav-width)] flex-col border-r border-line bg-surface-light lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[var(--sidenav-width)] flex-col border-r border-line bg-surface-light xl:flex">
         <div className="flex h-16 items-center px-5">
           <Link href="/" aria-label={product.name} className="flex items-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -166,7 +166,7 @@ export function SideNav() {
       {/* Mobile drawer + scrim. */}
       {open && (
         <div
-          className="fixed inset-0 z-40 lg:hidden"
+          className="fixed inset-0 z-40 xl:hidden"
           role="dialog"
           aria-modal="true"
           aria-label="Navigation"
