@@ -6,6 +6,7 @@ import { createBrowserWindow } from './window.js';
 import { registerIpc } from './ipc-handlers.js';
 import { tabManager } from './tabs/manager.js';
 import { setupAutoUpdate } from './updater.js';
+import { setupPermissions } from './permissions.js';
 import { loadDotEnv } from './env.js';
 
 // In development, pick up ANTHROPIC_API_KEY (and any other vars) from a local
@@ -34,6 +35,9 @@ async function createWindow() {
   mainWindow = createBrowserWindow({ preloadPath });
   tabManager.attachWindow(mainWindow);
   registerIpc(mainWindow);
+  // Deny capability requests to everything except this window's own chrome —
+  // the agent browses arbitrary sites in this same session.
+  setupPermissions(mainWindow.webContents.id);
 
   if (process.env.ELECTRON_RENDERER_URL) {
     await mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);

@@ -20,6 +20,7 @@ const BARS = 7;
 const SPEECH_ON = 0.06; // amplitude above which we treat it as speech
 const SILENCE_MS = 1100; // trailing silence that ends a continuous segment
 const MIN_CLIP_BYTES = 1400; // ignore near-empty blobs (a click, a breath)
+const MIC_START_TIMEOUT_MS = 10_000; // getUserMedia can hang rather than reject
 
 type Status = 'connecting' | 'listening' | 'transcribing' | 'error';
 
@@ -181,7 +182,16 @@ export function VoiceOverlay({
 
     (async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // getUserMedia can hang indefinitely rather than reject — no microphone
+        // attached, or an OS permission prompt that never gets answered. Left
+        // alone, the overlay sits on "Starting microphone…" forever with no
+        // explanation, which is exactly what it did before this guard.
+        const stream = await Promise.race([
+          navigator.mediaDevices.getUserMedia({ audio: true }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('timeout')), MIC_START_TIMEOUT_MS),
+          ),
+        ]);
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
           return;
@@ -200,10 +210,13 @@ export function VoiceOverlay({
         startRecorder();
       } catch (e) {
         if (!cancelled) {
+          const msg = e instanceof Error ? e.message : '';
           setError(
-            e instanceof Error && /denied|not allowed/i.test(e.message)
-              ? 'Microphone access was blocked. Allow it to use voice.'
-              : 'No microphone available.',
+            /timeout/i.test(msg)
+              ? 'The microphone did not start. Check that BulleBrowser is allowed to use it in System Settings › Privacy & Security › Microphone.'
+              : /denied|not allowed|permission/i.test(msg)
+                ? 'Microphone access was blocked. Allow it in System Settings › Privacy & Security › Microphone, then try again.'
+                : 'No microphone available.',
           );
           setStatus('error');
         }
