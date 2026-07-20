@@ -3,52 +3,26 @@ import Link from 'next/link';
 import { product } from '@bullebrowser/brand-tokens';
 import { asset } from '@/lib/asset';
 
+// Deep navy, matching the dark band on the Workflows page, with white type.
+// The mark is h-14, the same size as the header's, so the brand reads at one
+// scale top and bottom. The link row is gone: the top bar already carries the
+// navigation.
 export function Footer() {
   return (
-    <footer className="border-t border-line bg-surface-muted">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10 md:flex-row md:items-start md:justify-between">
-        <div className="flex flex-col gap-2">
-          {/* Larger than the header mark (48px vs 40px): the footer has the
-              room and reads as the anchoring brand sign-off. Same wrapper and
-              link-home behavior as the header, and the same left gridline
-              (both containers are mx-auto max-w-6xl px-6). */}
-          <Link href="/" aria-label={product.name} className="flex items-center">
-            <img
-              src={asset('/wordmark.png')}
-              alt={product.name}
-              height={48}
-              className="h-12 w-auto select-none"
-              draggable={false}
-            />
-          </Link>
-          <p className="max-w-xs text-sm text-ink-secondary">{product.tagline}.</p>
-          <p className="mt-2 text-xs text-ink-secondary">
-            © {new Date().getFullYear()} {product.vendor}. All rights reserved.
-          </p>
-        </div>
-        <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-ink-secondary">
-          <Link href="/features" className="hover:text-ink-primary">
-            Features
-          </Link>
-          <Link href="/preview" className="hover:text-ink-primary">
-            Preview
-          </Link>
-          <Link href="/download" className="hover:text-ink-primary">
-            Download
-          </Link>
-          <Link href="/install" className="hover:text-ink-primary">
-            Install
-          </Link>
-          <Link href="/privacy" className="hover:text-ink-primary">
-            Privacy
-          </Link>
-          <Link href="/about" className="hover:text-ink-primary">
-            About
-          </Link>
-          <a href={`mailto:${product.contactEmail}`} className="hover:text-ink-primary">
-            Contact
-          </a>
-        </nav>
+    <footer className="bg-surface-dark text-ink-inverse">
+      <div className="mx-auto flex max-w-6xl flex-col gap-3 px-6 py-12">
+        <Link href="/" aria-label={product.name} className="flex items-center">
+          <img
+            src={asset('/wordmark-light.png')}
+            alt={product.name}
+            className="h-14 w-auto select-none"
+            draggable={false}
+          />
+        </Link>
+        <p className="max-w-xs text-sm text-ink-inverse/75">{product.tagline}.</p>
+        <p className="mt-2 text-xs text-ink-inverse/65">
+          © {new Date().getFullYear()} {product.vendor}. All rights reserved.
+        </p>
       </div>
     </footer>
   );

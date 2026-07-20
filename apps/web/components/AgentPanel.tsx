@@ -1,10 +1,10 @@
 'use client';
 
-// The persistent right-hand agent panel — BulleBrowser's answer to Comet's
+// The persistent right-hand agent panel, BulleBrowser's answer to Comet's
 // main interaction area. It mirrors the real app: a browser sub-pane the agent
 // "drives" (a visible cursor that moves, types into the address bar, and
 // clicks) above a conversation the agent fills in, character by character, the
-// same way the shipping app streams. Not a recorded video — a scripted,
+// same way the shipping app streams. Not a recorded video, a scripted,
 // self-playing in-page animation that stays crisp at any size and loops.
 //
 // What is genuinely interactive here (works on the static site, no backend):
@@ -13,7 +13,7 @@
 //   • the "jump to latest" pointer button, shown whenever the conversation is
 //     scrolled up from the newest message;
 //   • the "+" attachment menu (Upload / Screenshot / Projects / Control
-//     Browser) — a real popover whose items honestly point to where each
+//     Browser), a real popover whose items honestly point to where each
 //     capability runs, the desktop app;
 //   • the BulleBrowser mark, a real link home.
 //
@@ -82,7 +82,7 @@ export function AgentPanel() {
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   };
 
-  // Keep the newest message in view as the agent streams — but only if the
+  // Keep the newest message in view as the agent streams, but only if the
   // viewer hasn't scrolled up to read (then the pointer button takes over).
   useEffect(() => {
     const el = feedRef.current;
@@ -342,7 +342,7 @@ function FeedRow({ item }: { item: Feed }) {
         </>
       ) : (
         <>
-          Added <span className="font-semibold">“Mount Fuji — 3,776&nbsp;m”</span> to your Trip notes.
+          Added <span className="font-semibold">“Mount Fuji, 3,776&nbsp;m”</span> to your Trip notes.
         </>
       )}
     </div>
@@ -454,7 +454,7 @@ function Composer({ typing }: { typing: boolean }) {
           </svg>
         </span>
 
-        {/* "+" popover — Comet-style attachment menu. Each item names where the
+        {/* "+" popover, Comet-style attachment menu. Each item names where the
             capability actually runs; the whole panel links into the app. */}
         {open && (
           <div className="absolute bottom-11 left-0 z-20 w-64 overflow-hidden rounded-xl border border-line bg-surface-light p-1 shadow-xl">
@@ -481,7 +481,7 @@ function Composer({ typing }: { typing: boolean }) {
               href="/download"
               className="mt-1 block rounded-lg bg-surface-muted px-2.5 py-2 text-center text-[11px] font-medium text-primary hover:bg-primary/10"
             >
-              These run in the BulleBrowser app — get it →
+              These run in the BulleBrowser app, get it →
             </Link>
           </div>
         )}
@@ -510,7 +510,7 @@ function PageContent({ page }: { page: Page }) {
         {['Mount Fuji - Wikipedia', 'List of mountains of Japan', 'Tallest peaks in Japan'].map((r, i) => (
           <div key={r} className={`rounded px-1 py-0.5 ${i === 0 ? 'bg-primary/5' : ''}`}>
             <div className="text-[10px] font-medium text-primary">{r}</div>
-            <div className="text-[9px] text-ink-secondary">en.wikipedia.org — a concise overview and key facts…</div>
+            <div className="text-[9px] text-ink-secondary">en.wikipedia.org, a concise overview and key facts…</div>
           </div>
         ))}
       </div>
@@ -522,7 +522,7 @@ function PageContent({ page }: { page: Page }) {
         <div className="text-[12px] font-bold text-ink-primary">Trip notes</div>
         <div className="h-2 w-3/4 rounded bg-surface-muted" />
         <div className="rounded border border-primary/30 bg-primary/5 px-2 py-1 text-[9.5px] text-ink-primary">
-          Mount Fuji — 3,776 m (12,388 ft)
+          Mount Fuji, 3,776 m (12,388 ft)
         </div>
         <div className="h-2 w-2/3 rounded bg-surface-muted" />
       </div>

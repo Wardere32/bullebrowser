@@ -12,7 +12,6 @@ import {
   formatBytes,
   isMobileUA,
   platformFamily,
-  RELEASES_PAGE,
   type Downloads,
   type Platform,
 } from '@/lib/releases';
@@ -41,7 +40,7 @@ export function DownloadButton({ size = 'lg' }: { size?: 'lg' | 'md' }) {
   }, []);
 
   const primary = dl?.forPlatform?.[platform];
-  // On a Mac, offer the other architecture as a secondary link — there is no
+  // On a Mac, offer the other architecture as a secondary link, there is no
   // universal build to fall back to.
   const macAlt =
     platformFamily(platform) === 'mac'
@@ -109,9 +108,9 @@ export function DownloadButton({ size = 'lg' }: { size?: 'lg' | 'md' }) {
   // No matching asset / API issue: always give a working path forward.
   return (
     <div className="flex flex-col items-start gap-1.5">
-      <a href={RELEASES_PAGE} className={cls} target="_blank" rel="noopener noreferrer">
+      <Link href="/download" className={cls}>
         Download BulleBrowser
-      </a>
+      </Link>
       <div className="text-xs text-ink-secondary">
         {loaded && dl?.apiUnavailable
           ? 'Live version check is busy; '
@@ -119,12 +118,8 @@ export function DownloadButton({ size = 'lg' }: { size?: 'lg' | 'md' }) {
             ? 'Preparing the first public release; '
             : ''}
           {loaded && dl?.latestTag && !dl.agentReady ? `Latest is ${dl.latestTag}; ` : ''}
-        <a href={RELEASES_PAGE} className="underline" target="_blank" rel="noopener noreferrer">
-          all releases on GitHub
-        </a>
-        {' · '}
         <Link href="/download" className="underline">
-          platforms &amp; checksums
+          all platforms
         </Link>
       </div>
     </div>

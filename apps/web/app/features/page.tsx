@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { product } from '@bullebrowser/brand-tokens';
-import { DownloadButton } from '@/components/DownloadButton';
 
 export const metadata: Metadata = {
   title: 'Features',
@@ -131,18 +130,10 @@ export default function FeaturesPage() {
         </ul>
       </Section>
 
-      <section className="border-t border-line bg-surface-muted">
+      <section className="bg-surface-dark text-ink-inverse">
         <div className="mx-auto max-w-3xl px-6 py-24 text-center">
           <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">Put the agent to work.</h2>
-          <p className="mt-4 text-ink-secondary">Free download for macOS, Windows, and Linux.</p>
-          <div className="mt-8 flex justify-center">
-            <DownloadButton />
-          </div>
-          <div className="mt-4 text-sm">
-            <Link href="/preview" className="text-primary underline-offset-4 hover:underline">
-              See the app screens →
-            </Link>
-          </div>
+          <p className="mt-4 text-ink-inverse/80">Available for macOS, Windows, and Linux.</p>
         </div>
       </section>
     </>

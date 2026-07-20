@@ -23,9 +23,7 @@ export default function DownloadPage() {
       </p>
       <DownloadTable />
       <p className="mt-6 text-xs text-ink-secondary">
-        Verify the SHA-256 of your download against checksums.txt before
-        installing. Releases are signed by BulleBrowser on macOS and
-        Windows.
+        Releases are signed and notarized by BulleBrowser on macOS and Windows.
       </p>
     </div>
   );

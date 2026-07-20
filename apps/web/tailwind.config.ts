@@ -23,7 +23,7 @@ const config: Config = {
         },
         ink: {
           primary: '#191825',
-          secondary: '#818891',
+          secondary: '#5F6772',
           inverse: '#FFFFFF',
         },
         line: {

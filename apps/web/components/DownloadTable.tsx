@@ -5,7 +5,6 @@ import Link from 'next/link';
 import {
   fetchDownloads,
   formatBytes,
-  RELEASES_PAGE,
   type Downloads,
   type Platform,
 } from '@/lib/releases';
@@ -45,16 +44,6 @@ export function DownloadTable() {
                     : ''
                 }`
               : 'No public release has been published yet. '}
-        {(dl?.apiUnavailable || noneYet) && (
-          <a
-            href={RELEASES_PAGE}
-            className="text-primary underline"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Browse all releases on GitHub
-          </a>
-        )}
       </p>
 
       {loaded && dl && (
@@ -67,18 +56,8 @@ export function DownloadTable() {
         >
           <span className={`h-2 w-2 rounded-full ${dl.agentReady ? 'bg-emerald-500' : 'bg-amber-500'}`} />
           {dl.agentReady
-            ? `Agentic browser build ready (${dl.latestTag ?? 'latest'})`
+            ? 'Agentic browser build ready'
             : `Agentic browser baseline requires ${dl.agentMinTag} or newer`}
-          {dl.latestReleaseUrl && (
-            <a
-              href={dl.latestReleaseUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline"
-            >
-              release notes
-            </a>
-          )}
         </div>
       )}
 
@@ -126,22 +105,9 @@ export function DownloadTable() {
       </div>
 
       <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-xs text-ink-secondary">
-        {dl?.checksumsUrl && (
-          <a href={dl.checksumsUrl} className="text-primary underline">
-            SHA-256 checksums.txt
-          </a>
-        )}
         <Link href="/install" className="text-primary underline">
           Installation &amp; first-launch guide
         </Link>
-        <a
-          href={RELEASES_PAGE}
-          className="text-primary underline"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Release history
-        </a>
       </div>
     </>
   );

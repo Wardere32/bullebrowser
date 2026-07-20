@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { product } from '@bullebrowser/brand-tokens';
-import { DownloadButton } from '@/components/DownloadButton';
 import { asset } from '@/lib/asset';
 
 export const metadata: Metadata = {
@@ -40,7 +39,6 @@ export default function InstallPage() {
         background needed.
       </p>
       <div className="mt-6">
-        <DownloadButton size="md" />
       </div>
 
       <div className="mt-12 space-y-8">
@@ -88,19 +86,11 @@ export default function InstallPage() {
         <p className="mt-1 text-ink-secondary">
           The installers are currently unsigned (no paid developer
           certificate yet), so macOS and Windows show a one-time warning. The
-          steps above are the standard way to launch unsigned apps. Every
-          release also ships a <code className="rounded bg-white px-1">checksums.txt</code>{' '}
-          so you can verify your download.
+          steps above are the standard way to launch unsigned apps.
         </p>
       </div>
 
       <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm">
-        <Link href="/download" className="text-primary underline">
-          All platforms &amp; checksums
-        </Link>
-        <Link href="/preview" className="text-primary underline">
-          See the app screens
-        </Link>
         <Link href="/features" className="text-primary underline">
           What the agent can do
         </Link>
