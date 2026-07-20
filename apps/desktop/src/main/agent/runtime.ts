@@ -445,10 +445,10 @@ const AGENT_CURSOR = `
             'transition:transform .45s cubic-bezier(.22,1,.36,1);will-change:transform;' +
             'filter:drop-shadow(0 1px 3px rgba(0,0,0,.4))}' +
           '.ring{position:fixed;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;' +
-            'border:2px solid #2563EB;opacity:0;pointer-events:none}' +
+            'border:2px solid #20BAD1;opacity:0;pointer-events:none}' +
           '.ring.go{animation:bb-ring .5s ease-out forwards}' +
-          '.halo{position:fixed;border:2px solid rgba(37,99,235,.9);border-radius:4px;' +
-            'box-shadow:0 0 0 3px rgba(37,99,235,.18);opacity:0;transition:opacity .2s}' +
+          '.halo{position:fixed;border:2px solid rgba(32, 186, 209,.9);border-radius:4px;' +
+            'box-shadow:0 0 0 3px rgba(32, 186, 209,.18);opacity:0;transition:opacity .2s}' +
           '.halo.go{opacity:1}' +
           '@keyframes bb-ring{0%{opacity:.9;transform:scale(.4)}100%{opacity:0;transform:scale(3.2)}}' +
           '@media (prefers-reduced-motion:reduce){.ptr{transition:none}.ring.go{animation:none}}' +

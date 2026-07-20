@@ -1,7 +1,7 @@
-@import '@fontsource/inter/400.css';
-@import '@fontsource/inter/500.css';
-@import '@fontsource/inter/600.css';
-@import '@fontsource/inter/700.css';
+@import '@fontsource/dm-sans/400.css';
+@import '@fontsource/dm-sans/500.css';
+@import '@fontsource/dm-sans/600.css';
+@import '@fontsource/dm-sans/700.css';
 @import '@fontsource/jetbrains-mono/400.css';
 @import '@fontsource/jetbrains-mono/600.css';
 
@@ -21,10 +21,10 @@ body,
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
   font-size: 14px;
-  color: #0f172a;
-  background: #0f172a;
+  color: #071422;
+  background: #071422;
   -webkit-font-smoothing: antialiased;
   -webkit-app-region: no-drag;
   user-select: none;
@@ -62,15 +62,15 @@ textarea {
   pointer-events: none;
   opacity: 0;
   box-shadow:
-    0 0 0 1px rgba(37, 99, 235, 0.22),
-    0 0 16px rgba(37, 99, 235, 0.2);
+    0 0 0 1px rgba(32, 186, 209, 0.22),
+    0 0 16px rgba(32, 186, 209, 0.2);
   transition:
     opacity 180ms ease,
     box-shadow 180ms ease;
 }
 
 .prompt-input-shell--focus {
-  border-color: #3b82f6;
+  border-color: #20BAD1;
 }
 
 .prompt-input-shell--focus::after {
@@ -78,7 +78,7 @@ textarea {
 }
 
 .prompt-input-shell--typing {
-  border-color: #2563eb;
+  border-color: #20BAD1;
 }
 
 .prompt-input-shell--typing::after {
@@ -87,7 +87,7 @@ textarea {
 }
 
 .prompt-input-shell--cooldown {
-  border-color: #3b82f6;
+  border-color: #20BAD1;
 }
 
 .prompt-input-shell--cooldown::after {
@@ -96,7 +96,7 @@ textarea {
 
 .prompt-input-shell--disabled {
   border-color: #d6dee8;
-  background: #f8fafc;
+  background: #EFF7F8;
 }
 
 .prompt-input-shell--disabled::after {
@@ -111,11 +111,11 @@ textarea {
 
 .prompt-input-shell--dark.prompt-input-shell--focus,
 .prompt-input-shell--dark.prompt-input-shell--cooldown {
-  border-color: rgba(59, 130, 246, 0.72);
+  border-color: rgba(32, 186, 209, 0.72);
 }
 
 .prompt-input-shell--dark.prompt-input-shell--typing {
-  border-color: rgba(37, 99, 235, 0.95);
+  border-color: rgba(32, 186, 209, 0.95);
 }
 
 .prompt-input-field {
@@ -124,7 +124,7 @@ textarea {
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: #0f172a;
+  color: #071422;
   padding: 8px;
   font-size: 14px;
   outline: none;
@@ -140,7 +140,7 @@ textarea {
 }
 
 .prompt-input-field--dark {
-  color: #f8fafc;
+  color: #EFF7F8;
 }
 
 .prompt-input-field--dark::placeholder {
@@ -150,18 +150,18 @@ textarea {
 @keyframes prompt-halo-pulse {
   0% {
     box-shadow:
-      0 0 0 1px rgba(37, 99, 235, 0.2),
-      0 0 12px rgba(37, 99, 235, 0.18);
+      0 0 0 1px rgba(32, 186, 209, 0.2),
+      0 0 12px rgba(32, 186, 209, 0.18);
   }
   50% {
     box-shadow:
-      0 0 0 1px rgba(37, 99, 235, 0.45),
-      0 0 20px rgba(37, 99, 235, 0.33);
+      0 0 0 1px rgba(32, 186, 209, 0.45),
+      0 0 20px rgba(32, 186, 209, 0.33);
   }
   100% {
     box-shadow:
-      0 0 0 1px rgba(37, 99, 235, 0.2),
-      0 0 12px rgba(37, 99, 235, 0.18);
+      0 0 0 1px rgba(32, 186, 209, 0.2),
+      0 0 12px rgba(32, 186, 209, 0.18);
   }
 }
 
@@ -211,11 +211,11 @@ textarea {
   padding: 1.5px;
   background: conic-gradient(
     from var(--halo-angle),
-    rgba(59, 130, 246, 0) 0deg,
-    rgba(59, 130, 246, 0.85) 70deg,
-    rgba(129, 140, 248, 0.9) 140deg,
-    rgba(59, 130, 246, 0) 250deg,
-    rgba(59, 130, 246, 0) 360deg
+    rgba(32, 186, 209, 0) 0deg,
+    rgba(32, 186, 209, 0.85) 70deg,
+    rgba(127, 217, 230, 0.9) 140deg,
+    rgba(32, 186, 209, 0) 250deg,
+    rgba(32, 186, 209, 0) 360deg
   );
   /* Paint only the padding ring: fill everything, then punch out the
      content box so just the 1.5px border remains. */
@@ -272,7 +272,7 @@ textarea {
 .md-prose {
   font-size: 13.5px;
   line-height: 1.55;
-  color: #0f172a;
+  color: #071422;
 }
 .md-prose h1,
 .md-prose h2,
@@ -296,8 +296,8 @@ textarea {
   border-radius: 4px;
 }
 .md-prose pre {
-  background: #0f172a;
-  color: #f8fafc;
+  background: #071422;
+  color: #EFF7F8;
   padding: 12px;
   border-radius: 8px;
   overflow-x: auto;
@@ -322,11 +322,11 @@ textarea {
   vertical-align: top;
 }
 .md-prose th {
-  background: #f8fafc;
+  background: #EFF7F8;
   font-weight: 600;
 }
 .md-prose a {
-  color: #2563eb;
+  color: #20BAD1;
   text-decoration: underline;
 }
 

@@ -9,30 +9,30 @@ const config: Config = {
     extend: {
       colors: {
         primary: {
-          DEFAULT: '#2563EB',
-          hover: '#1D4ED8',
+          DEFAULT: '#20BAD1',
+          hover: '#1A9BAE',
         },
         accent: {
-          DEFAULT: '#F59E0B',
-          hover: '#D97706',
+          DEFAULT: '#E8D833',
+          hover: '#CBBC26',
         },
         surface: {
-          dark: '#0F172A',
+          dark: '#071422',
           light: '#FFFFFF',
-          muted: '#F8FAFC',
+          muted: '#EFF7F8',
         },
         ink: {
-          primary: '#0F172A',
-          secondary: '#64748B',
-          inverse: '#F8FAFC',
+          primary: '#191825',
+          secondary: '#818891',
+          inverse: '#FFFFFF',
         },
         line: {
-          DEFAULT: '#E2E8F0',
-          strong: '#CBD5E1',
+          DEFAULT: '#DCE9EC',
+          strong: '#BFD4D9',
         },
       },
       fontFamily: {
-        ui: ['var(--font-inter)', 'system-ui', 'sans-serif'],
+        ui: ['var(--font-dm-sans)', 'system-ui', 'sans-serif'],
         mono: ['var(--font-jetbrains)', 'ui-monospace', 'Menlo', 'monospace'],
       },
     },

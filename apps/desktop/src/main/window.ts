@@ -13,7 +13,7 @@ export function createBrowserWindow(opts: WindowOptions): BrowserWindow {
     minWidth: 960,
     minHeight: 600,
     title: product.windowTitle,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#071422',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     autoHideMenuBar: true,
     show: false,

@@ -75,7 +75,7 @@ function Tab({
       onClick={() => window.bullebrowser.tabs.switch(tab.id)}
       className={`group relative flex h-7 w-[180px] items-center gap-2 rounded-t-md px-2 text-left text-xs transition-colors ${
         tab.active
-          ? 'bg-surface-light text-ink-primary shadow-[0_-2px_0_0_#2563EB_inset]'
+          ? 'bg-surface-light text-ink-primary shadow-[0_-2px_0_0_#20BAD1_inset]'
           : 'bg-white/5 text-ink-inverse/80 hover:bg-white/10'
       }`}
     >

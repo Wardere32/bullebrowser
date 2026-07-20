@@ -597,7 +597,7 @@ export function AiPanel() {
             className="inline-flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-muted"
           >
             <svg viewBox="0 0 64 64" className="h-5 w-5" aria-hidden>
-              <rect x="4" y="4" width="56" height="56" rx="16" fill="#2563EB" />
+              <rect x="4" y="4" width="56" height="56" rx="16" fill="#20BAD1" />
               <circle cx="26" cy="30" r="12" fill="none" stroke="#fff" strokeWidth="5" />
               <circle cx="42" cy="40" r="6" fill="#fff" />
             </svg>

@@ -13,26 +13,29 @@ export const product = {
   contactEmail: 'hello@bulleconsulting.com',
 } as const;
 
+// BulleBrowser brand palette. These seven are the brand's own values; the
+// remaining tokens (hover states, borders) are derived from them so nothing in
+// the UI has to invent a colour.
 export const colors = {
-  primary: '#2563EB',
-  primaryHover: '#1D4ED8',
-  accent: '#F59E0B',
-  accentHover: '#D97706',
-  surfaceDark: '#0F172A',
-  surfaceLight: '#FFFFFF',
-  surfaceMuted: '#F8FAFC',
-  textPrimary: '#0F172A',
-  textSecondary: '#64748B',
-  textInverse: '#F8FAFC',
-  border: '#E2E8F0',
-  borderStrong: '#CBD5E1',
+  primary: '#20BAD1', // Teal
+  primaryHover: '#1A9BAE', // Teal, darkened for hover/active
+  accent: '#E8D833', // Yellow Gold
+  accentHover: '#CBBC26', // Gold, darkened for hover/active
+  surfaceDark: '#071422', // Deep Navy
+  surfaceLight: '#FFFFFF', // White
+  surfaceMuted: '#EFF7F8', // Ice Blue
+  textPrimary: '#191825', // Near Black — headings
+  textSecondary: '#818891', // Slate Gray — body text
+  textInverse: '#FFFFFF', // White
+  border: '#DCE9EC', // Ice Blue, stepped down for hairlines
+  borderStrong: '#BFD4D9',
   success: '#10B981',
   danger: '#EF4444',
-  warning: '#F59E0B',
+  warning: '#E8D833', // the brand gold doubles as the warning tone
 } as const;
 
 export const typography = {
-  uiFont: '"Inter", system-ui, -apple-system, "Segoe UI", sans-serif',
+  uiFont: '"DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif',
   monoFont: '"JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace',
   scale: {
     xs: '0.75rem',

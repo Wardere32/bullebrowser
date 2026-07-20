@@ -1,14 +1,14 @@
 import type { Metadata } from 'next';
-import { Inter, JetBrains_Mono } from 'next/font/google';
+import { DM_Sans, JetBrains_Mono } from 'next/font/google';
 import { product } from '@bullebrowser/brand-tokens';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 import { SideNav } from '@/components/SideNav';
 import './globals.css';
 
-const inter = Inter({
+const dmSans = DM_Sans({
   subsets: ['latin'],
-  variable: '--font-inter',
+  variable: '--font-dm-sans',
   display: 'swap',
 });
 const jetbrains = JetBrains_Mono({
@@ -65,7 +65,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrains.variable}`}>
+    <html lang="en" className={`${dmSans.variable} ${jetbrains.variable}`}>
       <head>
         {/* http-equiv (not name) — this is what browsers actually enforce. */}
         <meta httpEquiv="Content-Security-Policy" content={CSP} />

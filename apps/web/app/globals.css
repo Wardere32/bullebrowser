@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 :root {
-  --color-primary: #2563eb;
-  --color-accent: #f59e0b;
+  --color-primary: #20bad1;
+  --color-accent: #e8d833;
   /* Width of the persistent left rail on desktop. Consumed by the shell
      grid in layout.tsx via Tailwind's arbitrary-value syntax and kept here
      as the single source of truth. */
@@ -12,7 +12,7 @@
 }
 
 html {
-  font-family: var(--font-inter), system-ui, sans-serif;
+  font-family: var(--font-dm-sans), system-ui, sans-serif;
   scroll-behavior: smooth;
 }
 
