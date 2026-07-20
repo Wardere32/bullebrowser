@@ -160,16 +160,10 @@ export async function startAgentRun(
   });
 
   const skill = req.skillId ? findSkill(req.skillId) : undefined;
-  // NOTE: no skill currently ships with the id 'compliance_review' (the Skill
-  // union is page_assistant | site_navigator | workflow_automator), so this
-  // branch is presently unreachable and the user's complianceChecklist setting
-  // is never applied. Left as-is deliberately — wiring the compliance skill up
-  // is a product decision, not a typecheck fix. The widened compare keeps the
-  // intent expressible without changing today's behaviour.
+  // The compliance skill now exists, so this reaches the user's checklist from
+  // Settings and appends it to the skill's own prompt.
   const userChecklist =
-    (skill?.id as string | undefined) === 'compliance_review'
-      ? getSettings().complianceChecklist
-      : [];
+    skill?.id === 'compliance_review' ? getSettings().complianceChecklist : [];
   const checklistAppendix =
     userChecklist.length > 0
       ? '\n\nUser-provided checklist items (run these in addition to the defaults above, using the same Status legend):\n' +

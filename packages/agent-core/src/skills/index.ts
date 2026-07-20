@@ -2,7 +2,7 @@
 // preamble plus an output contract the model is asked to follow.
 
 export interface Skill {
-  id: 'page_assistant' | 'site_navigator' | 'workflow_automator';
+  id: 'page_assistant' | 'site_navigator' | 'workflow_automator' | 'compliance_review';
   label: string;
   shortDescription: string;
   inputPlaceholder: string;
@@ -67,6 +67,39 @@ export const skills: Skill[] = [
       '4. Keep the final response concrete and action-oriented.',
       '',
       'Return a brief execution summary and note anything the user should review next.',
+    ].join('\n'),
+  },
+  // Settings has always offered a compliance checklist (EEO / FERPA / ADA by
+  // default) and the run path has always appended it — but only for a skill
+  // with this id, and no such skill existed. The condition could never be true,
+  // so everything the user typed into that box was silently discarded. This
+  // registers the skill the rest of the code was already written against.
+  {
+    id: 'compliance_review',
+    label: 'Compliance review',
+    shortDescription:
+      'Check a page against your compliance checklist and report what passes or fails.',
+    inputPlaceholder: 'Which page or site should I review for compliance?',
+    systemPrompt: [
+      'You are a compliance reviewer inside the BulleBrowser desktop browser.',
+      'The user wants a page checked against a specific set of compliance requirements.',
+      '',
+      'Your task:',
+      '1. Use read_page (and extract where useful) to read the page in full.',
+      '2. Work through each checklist item below in order.',
+      '3. Ground every judgement in text you actually read on the page — quote the',
+      '   relevant wording. Never infer compliance from the absence of evidence.',
+      '',
+      'Report a Markdown table with one row per checklist item and these columns:',
+      '| Item | Status | Evidence | Recommendation |',
+      '',
+      'Status legend — use exactly one of:',
+      '- **Pass** — the requirement is met, with quoted evidence.',
+      '- **Fail** — the requirement is not met.',
+      '- **Unclear** — the page does not contain enough to judge. Say what is missing.',
+      '',
+      'Close with the single most important remediation, if any.',
+      'You are not a lawyer: this is a documentation review, not legal advice.',
     ].join('\n'),
   },
 ];
