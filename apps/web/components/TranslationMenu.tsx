@@ -10,7 +10,6 @@
 // wiring one is a separate piece of work.
 
 import { useEffect, useRef, useState } from 'react';
-import { useT } from '@/lib/i18n';
 
 interface Language {
   code: string;
@@ -20,7 +19,7 @@ interface Language {
 }
 
 const LANGUAGES: Language[] = [
-  { code: 'en', label: 'English', flag: '🇬🇧', dir: 'ltr' },
+  { code: 'en', label: 'English', flag: '🇺🇸', dir: 'ltr' },
   { code: 'fr', label: 'Français', flag: '🇫🇷', dir: 'ltr' },
   { code: 'ar', label: 'العربية', flag: '🇸🇦', dir: 'rtl' },
   // Latin American Spanish: the variety the great majority of the world's
@@ -34,7 +33,6 @@ const LANGUAGES: Language[] = [
 const STORAGE_KEY = 'bullebrowser:lang';
 
 export function TranslationMenu() {
-  const t = useT();
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState<Language>(LANGUAGES[0]!);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -81,15 +79,15 @@ export function TranslationMenu() {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={t('nav.translation')}
+        aria-label="Translation"
         className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-ink-secondary transition-colors hover:text-ink-primary"
       >
         <span aria-hidden>{active.flag}</span>
         {/* Fixed window the label scrolls through, so the bar never reflows. */}
         <span className="ticker-window" aria-hidden>
-          <span className="ticker-track">{t('nav.translation')}</span>
+          <span className="ticker-track">Translation</span>
         </span>
-        <span className="sr-only">{t('nav.translation')}</span>
+        <span className="sr-only">Translation</span>
         <svg
           viewBox="0 0 24 24"
           className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-180' : ''}`}
@@ -107,7 +105,7 @@ export function TranslationMenu() {
       {open && (
         <ul
           role="listbox"
-          aria-label={t('nav.chooseLanguage')}
+          aria-label="Choose a language"
           className="absolute right-0 top-full z-50 mt-2 max-h-80 w-52 overflow-y-auto rounded-xl border border-line bg-surface-light p-1 shadow-xl"
         >
           {LANGUAGES.map((lang) => (
