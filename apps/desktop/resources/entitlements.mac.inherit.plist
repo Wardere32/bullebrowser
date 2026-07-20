@@ -15,11 +15,16 @@
     <true/>
     <key>com.apple.security.cs.allow-dyld-environment-variables</key>
     <true/>
+    <!-- com.apple.security.inherit MUST stand alone among App Sandbox
+         entitlements: it means "take the parent's", and Apple rejects it when
+         combined with another sandbox entitlement. Adding
+         com.apple.security.device.audio-input here alongside it (to give the
+         helper the microphone) produced an invalid entitlement set and failed
+         signing/notarization every time — v0.2.24 and v0.2.25 both died in the
+         "Build, sign & notarize macOS installer" step because of it.
+         The helper gets the microphone by inheriting it from the app; the
+         audio-input entitlement belongs only in entitlements.mac.plist. -->
     <key>com.apple.security.inherit</key>
-    <true/>
-    <!-- The renderer/helper process is what actually opens the mic stream, so
-         it needs the audio-input entitlement too. -->
-    <key>com.apple.security.device.audio-input</key>
     <true/>
   </dict>
 </plist>
