@@ -15,21 +15,19 @@ interface Language {
   code: string;
   label: string;
   flag: string;
+  dir: 'ltr' | 'rtl';
 }
 
 const LANGUAGES: Language[] = [
-  { code: 'en', label: 'English', flag: '🇺🇸' },
-  { code: 'es', label: 'Español', flag: '🇪🇸' },
-  { code: 'fr', label: 'Français', flag: '🇫🇷' },
-  { code: 'de', label: 'Deutsch', flag: '🇩🇪' },
-  { code: 'pt', label: 'Português', flag: '🇵🇹' },
-  { code: 'it', label: 'Italiano', flag: '🇮🇹' },
-  { code: 'ar', label: 'العربية', flag: '🇸🇦' },
-  { code: 'so', label: 'Soomaali', flag: '🇸🇴' },
-  { code: 'sw', label: 'Kiswahili', flag: '🇰🇪' },
-  { code: 'zh', label: '中文', flag: '🇨🇳' },
-  { code: 'ja', label: '日本語', flag: '🇯🇵' },
-  { code: 'hi', label: 'हिन्दी', flag: '🇮🇳' },
+  { code: 'en', label: 'English', flag: '🇬🇧', dir: 'ltr' },
+  { code: 'fr', label: 'Français', flag: '🇫🇷', dir: 'ltr' },
+  { code: 'ar', label: 'العربية', flag: '🇸🇦', dir: 'rtl' },
+  // Latin American Spanish: the variety the great majority of the world's
+  // Spanish speakers use, and neutral across the region.
+  { code: 'es-419', label: 'Español', flag: '🇲🇽', dir: 'ltr' },
+  // European Portuguese as the formal standard, readable to speakers in
+  // Portugal, Brazil and lusophone Africa alike.
+  { code: 'pt-PT', label: 'Português', flag: '🇵🇹', dir: 'ltr' },
 ];
 
 const STORAGE_KEY = 'bullebrowser:lang';
@@ -42,7 +40,11 @@ export function TranslationMenu() {
   useEffect(() => {
     const saved = window.localStorage.getItem(STORAGE_KEY);
     const found = LANGUAGES.find((l) => l.code === saved);
-    if (found) setActive(found);
+    if (found) {
+      setActive(found);
+      document.documentElement.lang = found.code;
+      document.documentElement.dir = found.dir;
+    }
   }, []);
 
   useEffect(() => {
@@ -66,6 +68,7 @@ export function TranslationMenu() {
     setOpen(false);
     window.localStorage.setItem(STORAGE_KEY, lang.code);
     document.documentElement.lang = lang.code;
+    document.documentElement.dir = lang.dir;
   };
 
   return (
