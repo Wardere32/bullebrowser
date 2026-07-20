@@ -32,7 +32,7 @@ const config: Config = {
         },
       },
       fontFamily: {
-        ui: ['var(--font-dm-sans)', 'system-ui', 'sans-serif'],
+        ui: ['"DM Sans"', 'system-ui', 'sans-serif'],
         mono: ['var(--font-jetbrains)', 'ui-monospace', 'Menlo', 'monospace'],
       },
     },

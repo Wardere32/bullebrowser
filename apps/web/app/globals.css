@@ -12,7 +12,7 @@
 }
 
 html {
-  font-family: var(--font-dm-sans), system-ui, sans-serif;
+  font-family: 'DM Sans', system-ui, sans-serif;
   scroll-behavior: smooth;
 }
 

@@ -1,16 +1,18 @@
 import type { Metadata } from 'next';
-import { DM_Sans, JetBrains_Mono } from 'next/font/google';
+import { JetBrains_Mono } from 'next/font/google';
+// Self-hosted rather than fetched from Google at build time: next/font/google
+// downloads the family during `next build`, which makes the build depend on
+// reaching fonts.googleapis.com. @fontsource ships the files in the package.
+import '@fontsource/dm-sans/400.css';
+import '@fontsource/dm-sans/500.css';
+import '@fontsource/dm-sans/600.css';
+import '@fontsource/dm-sans/700.css';
 import { product } from '@bullebrowser/brand-tokens';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 import { SideNav } from '@/components/SideNav';
 import './globals.css';
 
-const dmSans = DM_Sans({
-  subsets: ['latin'],
-  variable: '--font-dm-sans',
-  display: 'swap',
-});
 const jetbrains = JetBrains_Mono({
   subsets: ['latin'],
   variable: '--font-jetbrains',
@@ -65,7 +67,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${dmSans.variable} ${jetbrains.variable}`}>
+    <html lang="en" className={`${jetbrains.variable}`}>
       <head>
         {/* http-equiv (not name) — this is what browsers actually enforce. */}
         <meta httpEquiv="Content-Security-Policy" content={CSP} />
