@@ -97,14 +97,22 @@ export function AiPanel() {
       const settings: AppSettings = await bridge.settings.get();
       setModel(settings.defaultModel);
       setHasKey(await bridge.secrets.hasApiKey(providerFor(settings.defaultModel)));
+      // Opening the app lands on a NEW session rather than resuming the last
+      // one — a browser you just opened shouldn't drop you back into whatever
+      // you were mid-way through, and the previous chats are a click away under
+      // History. The one exception: if the newest conversation is still empty,
+      // reuse it, so relaunching repeatedly doesn't litter History with blank
+      // rows nobody asked for.
       const list = await bridge.conversations.list();
-      setConversations(list);
-      if (list.length === 0) {
-        const first = await bridge.conversations.create();
-        setCurrent(first);
-      } else if (list[0]) {
-        const detail = await bridge.conversations.get(list[0].id);
-        setCurrent(detail);
+      const newest = list[0];
+      const newestDetail = newest ? await bridge.conversations.get(newest.id) : null;
+      if (newestDetail && newestDetail.messages.length === 0) {
+        setConversations(list);
+        setCurrent(newestDetail);
+      } else {
+        const fresh = await bridge.conversations.create();
+        setCurrent(fresh);
+        setConversations(await bridge.conversations.list());
       }
     })();
   }, [setConversations, setCurrent]);
