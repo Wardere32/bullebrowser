@@ -22,6 +22,15 @@ async function launch() {
   const env = { ...process.env, NODE_ENV: 'test' };
   delete env.ELECTRON_RUN_AS_NODE;
 
+  // The panel renders the "connect your key" state instead of the composer
+  // when no key is configured, so without this every assertion below about the
+  // textarea, the "+" menu or the voice controls fails — which is exactly why
+  // this suite passed locally (a developer .env supplies ANTHROPIC_API_KEY) and
+  // failed on CI, where there is no .env. hasApiKey() falls back to the
+  // environment, so a fixture value is enough to render the composer. It is
+  // never used to reach the network: no test here starts an agent run.
+  env.ANTHROPIC_API_KEY = 'sk-ant-e2e-fixture-key-not-real-0000000000000000';
+
   const app = await electron.launch({
     args: ['.', '--no-sandbox', `--user-data-dir=${userData}`],
     cwd: appRoot,
