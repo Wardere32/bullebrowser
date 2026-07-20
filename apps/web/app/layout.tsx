@@ -8,6 +8,7 @@ import '@fontsource/dm-sans/500.css';
 import '@fontsource/dm-sans/600.css';
 import '@fontsource/dm-sans/700.css';
 import { product } from '@bullebrowser/brand-tokens';
+import { LocaleProvider } from '@/lib/i18n';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 import './globals.css';
@@ -72,11 +73,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta httpEquiv="Content-Security-Policy" content={CSP} />
       </head>
       <body className="bg-surface-light text-ink-primary antialiased">
+        <LocaleProvider>
         <div className="flex min-h-screen flex-col">
           <Header />
           <main className="flex-1">{children}</main>
           <Footer />
         </div>
+        </LocaleProvider>
       </body>
     </html>
   );
