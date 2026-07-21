@@ -1,8 +1,8 @@
 'use client';
 
-// The Translation control in the top bar. The label itself tickers across a
-// fixed-width window at a steady, readable pace, and opens a language list with
-// each country's flag beside it.
+// The Translation control in the top bar. It shows just the active language's
+// flag and a chevron — no label, no ticker — and opens a language list with
+// each country's flag beside it. The accessible name stays "Translation".
 //
 // Choosing a language records the preference and sets the document language,
 // which is what assistive tech and the browser's own translation prompt read.
@@ -82,11 +82,7 @@ export function TranslationMenu() {
         aria-label="Translation"
         className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-ink-secondary transition-colors hover:text-ink-primary"
       >
-        <span aria-hidden>{active.flag}</span>
-        {/* Fixed window the label scrolls through, so the bar never reflows. */}
-        <span className="ticker-window" aria-hidden>
-          <span className="ticker-track">Translation</span>
-        </span>
+        <span className="text-base leading-none" aria-hidden>{active.flag}</span>
         <span className="sr-only">Translation</span>
         <svg
           viewBox="0 0 24 24"

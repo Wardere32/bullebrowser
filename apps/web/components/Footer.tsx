@@ -7,7 +7,7 @@ import { asset } from '@/lib/asset';
 import { useT } from '@/lib/i18n';
 
 // Deep navy, matching the dark band on the Workflows page, with white type.
-// The mark is h-14, the same size as the header's, so the brand reads at one
+// The mark is h-12, the same size as the header's, so the brand reads at one
 // scale top and bottom. The link row is gone: the top bar already carries the
 // navigation.
 export function Footer() {
@@ -19,7 +19,7 @@ export function Footer() {
           <img
             src={asset('/wordmark-light.png')}
             alt={product.name}
-            className="h-14 w-auto select-none"
+            className="h-12 w-auto select-none"
             draggable={false}
           />
         </Link>
