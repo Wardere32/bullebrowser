@@ -15,11 +15,11 @@
 //   • the "+" attachment menu (Upload / Screenshot / Projects / Control
 //     Browser), a real popover whose items honestly point to where each
 //     capability runs, the desktop app;
+//   • the composer's voice controls, mirroring the shipping app: the mic opens
+//     a "Listening… speak, then Send" state, and the soundwave opens hands-free
+//     Voice Mode. On the static site these are honest UI states (no audio is
+//     captured); in the app they drive the live agent;
 //   • the BulleBrowser mark, a real link home.
-//
-// Deliberately omitted on the marketing site: live voice / soundwave input.
-// It needs the running agent to hear and act, so it belongs to the in-product
-// UI phase rather than a static page that could only fake it.
 //
 // Honors prefers-reduced-motion by holding a finished, readable state.
 
@@ -392,6 +392,7 @@ const ATTACH: { key: string; label: string; note: string; icon: React.ReactNode 
 function Composer({ typing }: { typing: boolean }) {
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [voice, setVoice] = useState<'idle' | 'listening' | 'voice'>('idle');
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
   // Close the popover on any outside click.
@@ -405,22 +406,30 @@ function Composer({ typing }: { typing: boolean }) {
   }, [open]);
 
   return (
-    <div className="border-t border-line p-3">
-      {/* The halo rides on this wrapper: active while the agent composes
-          (`is-active`) or the visitor focuses the field (`:focus-within`). */}
-      <div className={`halo rounded-xl ${typing ? 'is-active' : ''}`}>
-        <div className="flex items-center gap-2 rounded-xl border border-line bg-surface-light px-2 py-1.5">
-          <input
-            type="text"
-            readOnly
-            aria-label="Ask BulleBrowser"
-            placeholder="Ask BulleBrowser to do something…"
-            className="min-w-0 flex-1 bg-transparent px-1 text-[12px] text-ink-primary outline-none placeholder:text-ink-secondary"
-          />
-        </div>
-      </div>
+    <div className="relative border-t border-line p-3">
+      {/* Hands-free Voice Mode overlays the whole composer footer, as in the app. */}
+      {voice === 'voice' && <VoiceOverlay onStop={() => setVoice('idle')} />}
 
-      {/* Control row: "+" menu, brand mark, and a send affordance. */}
+      {/* Input area: the halo'd field, or the mic's "listening" state. The halo
+          rides on the wrapper: active while the agent composes (`is-active`) or
+          the visitor focuses the field (`:focus-within`). */}
+      {voice === 'listening' ? (
+        <ListeningBar onSend={() => setVoice('idle')} onCancel={() => setVoice('idle')} />
+      ) : (
+        <div className={`halo rounded-xl ${typing ? 'is-active' : ''}`}>
+          <div className="flex items-center gap-2 rounded-xl border border-line bg-surface-light px-2 py-1.5">
+            <input
+              type="text"
+              readOnly
+              aria-label="Ask BulleBrowser"
+              placeholder="Ask BulleBrowser to do something…"
+              className="min-w-0 flex-1 bg-transparent px-1 text-[12px] text-ink-primary outline-none placeholder:text-ink-secondary"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Control row: "+" menu, brand mark, mic, Voice Mode, and send. */}
       <div ref={wrapRef} className="relative mt-2 flex items-center gap-1.5">
         <button
           type="button"
@@ -446,9 +455,46 @@ function Composer({ typing }: { typing: boolean }) {
           <img src={asset('/logo.svg')} alt="" className="h-5 w-5 rounded" draggable={false} />
         </Link>
 
-        <div className="ml-auto text-[11px] text-ink-secondary">{note}</div>
+        {/* Mic → a single "listening" capture. */}
+        <button
+          type="button"
+          onClick={() => {
+            setVoice('listening');
+            setOpen(false);
+          }}
+          aria-label="Voice message"
+          aria-pressed={voice === 'listening'}
+          className={`inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${
+            voice === 'listening'
+              ? 'border-primary bg-primary/10 text-primary'
+              : 'border-line text-ink-secondary hover:text-ink-primary'
+          }`}
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+            <rect x="9" y="3" width="6" height="11" rx="3" />
+            <path d="M6 11a6 6 0 0 0 12 0M12 17v4" />
+          </svg>
+        </button>
 
-        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary text-white">
+        {/* Soundwave → hands-free Voice Mode. */}
+        <button
+          type="button"
+          onClick={() => {
+            setVoice('voice');
+            setOpen(false);
+          }}
+          aria-label="Voice mode"
+          aria-pressed={voice === 'voice'}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-line text-ink-secondary transition-colors hover:text-ink-primary"
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+            <path d="M4 10v4M8 6v12M12 3v18M16 6v12M20 10v4" />
+          </svg>
+        </button>
+
+        <div className="ml-auto truncate text-[11px] text-ink-secondary">{note}</div>
+
+        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-white">
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
             <path d="M5 12h14M13 6l6 6-6 6" />
           </svg>
@@ -486,6 +532,73 @@ function Composer({ typing }: { typing: boolean }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ---- Voice controls (listening + hands-free Voice Mode) ---------------------
+
+// A small animated equalizer. Bars scale on the CSS `eq-bar` keyframe and hold
+// a steady height for anyone who prefers reduced motion.
+function Equalizer({ height = 16 }: { height?: number }) {
+  const delays = [0, 0.18, 0.36, 0.12, 0.28, 0.06, 0.22];
+  return (
+    <span className="inline-flex items-center gap-[3px]" aria-hidden>
+      {delays.map((d, i) => (
+        <span
+          key={i}
+          className="eq-bar block w-[3px] rounded-full bg-current"
+          style={{ height, transformOrigin: 'center', animation: `eq-bar 0.9s ease-in-out ${d}s infinite` }}
+        />
+      ))}
+    </span>
+  );
+}
+
+// Mic capture: replaces the input with a listening row and Send / Cancel.
+function ListeningBar({ onSend, onCancel }: { onSend: () => void; onCancel: () => void }) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-primary/40 bg-primary/5 px-3 py-2">
+      <span className="text-primary">
+        <Equalizer />
+      </span>
+      <span className="flex-1 text-[12px] text-ink-primary">
+        <span className="font-medium">Listening…</span> speak, then Send
+      </span>
+      <button
+        type="button"
+        onClick={onCancel}
+        className="rounded-full px-2.5 py-1 text-[11px] text-ink-secondary transition-colors hover:text-ink-primary"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        onClick={onSend}
+        className="rounded-full bg-primary px-3 py-1 text-[11px] font-medium text-white"
+      >
+        Send
+      </button>
+    </div>
+  );
+}
+
+// Hands-free Voice Mode: a full overlay over the composer footer.
+function VoiceOverlay({ onStop }: { onStop: () => void }) {
+  return (
+    <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 rounded-b-2xl bg-surface-light/95 backdrop-blur">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">Voice Mode</span>
+      <span className="text-primary">
+        <Equalizer height={26} />
+      </span>
+      <span className="text-[12px] text-ink-secondary">Listening… speak your commands</span>
+      <button
+        type="button"
+        onClick={onStop}
+        className="mt-1 rounded-full border border-line px-3 py-1 text-[11px] font-medium text-ink-primary transition-colors hover:border-primary/50"
+      >
+        Stop Voice Mode
+      </button>
     </div>
   );
 }

@@ -89,6 +89,23 @@ html {
   }
 }
 
+/* Voice-input equalizer bars for the agent panel's listening / voice modes. */
+@keyframes eq-bar {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .eq-bar {
+    animation: none !important;
+    transform: scaleY(0.6);
+  }
+}
+
 .prose-lite {
   font-size: 16px;
   line-height: 1.7;
