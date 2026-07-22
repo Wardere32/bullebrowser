@@ -1,44 +1,43 @@
 'use client';
 
-// The persistent right-hand agent panel, BulleBrowser's answer to Comet's
-// main interaction area. It mirrors the real app: a browser sub-pane the agent
-// "drives" (a visible cursor that moves, types into the address bar, and
-// clicks) above a conversation the agent fills in, character by character, the
-// same way the shipping app streams. Not a recorded video, a scripted,
-// self-playing in-page animation that stays crisp at any size and loops.
+// The home-page "live demo": a faithful, self-playing replica of the actual
+// BulleBrowser desktop window — the same thing a user sees while using it. On
+// the left, the browser pane the agent drives (a visible cursor that moves,
+// types the address, and clicks). On the right, the real AI panel, pixel-for-
+// pixel with the app's `AiPanel`: the "BulleBrowser Agent" header with History
+// / New chat, the Skills + model selectors, the "What can I help you browse?"
+// empty state, the streaming conversation with its collapsible activity feed,
+// and the composer whose control row carries the "+" attachment menu, the
+// brand-mark home bubble, the one-shot mic, and continuous Voice Mode.
 //
-// What is genuinely interactive here (works on the static site, no backend):
-//   • the halo ring that circles the composer while the agent is composing or
-//     the visitor focuses the field (CSS `.halo` in globals.css);
-//   • the "jump to latest" pointer button, shown whenever the conversation is
-//     scrolled up from the newest message;
-//   • the "+" attachment menu (Upload / Screenshot / Projects / Control
-//     Browser), a real popover whose items honestly point to where each
-//     capability runs, the desktop app;
-//   • the composer's voice controls, mirroring the shipping app: the mic opens
-//     a "Listening… speak, then Send" state, and the soundwave opens hands-free
-//     Voice Mode. On the static site these are honest UI states (no audio is
-//     captured); in the app they drive the live agent;
-//   • the BulleBrowser mark, a real link home.
+// Genuinely interactive on the static site (no backend): the "+" menu, the mic
+// and Voice Mode overlays, the halo ring on the composer, the jump-to-latest
+// pointer, and the home bubble (a real link home). The script also showcases
+// each of those states on a loop so the page shows the whole app at a glance.
+//
+// Mirrors these app sources so it stays honest to the product:
+//   apps/desktop/src/renderer/components/AiPanel.tsx
+//   apps/desktop/src/renderer/components/AttachMenu.tsx
+//   apps/desktop/src/renderer/components/VoiceOverlay.tsx
 //
 // Honors prefers-reduced-motion by holding a finished, readable state.
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { asset } from '@/lib/asset';
 
 type Page = 'blank' | 'results' | 'article' | 'notes';
+type Voice = 'idle' | 'once' | 'continuous';
 
 interface Cursor {
   x: number;
   y: number;
 }
 
-// One conversation entry. Activities collapse to a checked step once the next
-// entry arrives; the latest activity shows a live pulsing dot.
+// The conversation. Activity groups one run's steps into a single collapsible
+// feed, exactly like the app; the answer renders as plain prose beneath it.
 type Feed =
   | { kind: 'user'; text: string }
-  | { kind: 'activity'; text: string; done: boolean }
+  | { kind: 'activity'; steps: string[]; done: boolean }
   | { kind: 'answer'; html: 'fuji' | 'notes' };
 
 interface State {
@@ -46,15 +45,26 @@ interface State {
   page: Page;
   cursor: Cursor;
   click: boolean;
-  composer: string; // text currently being typed into the composer
-  typing: boolean; // agent is actively composing → halo on
+  composer: string;
+  typing: boolean;
   feed: Feed[];
 }
+
+// The real app's registered skills (labels + short descriptions) and its model
+// names, so the selectors and empty state read exactly as the product does.
+const SKILLS = [
+  { id: 'page_assistant', label: 'Page assistant', short: 'Read a page, summarize it, and answer with on-page context.' },
+  { id: 'site_navigator', label: 'Site navigator', short: 'Open a URL, find the right control, and complete a browser task.' },
+  { id: 'workflow_automator', label: 'Workflow automator', short: 'Coordinate multiple browser steps into a repeatable workflow.' },
+  { id: 'compliance_review', label: 'Compliance review', short: 'Check a page against your compliance checklist and report what passes or fails.' },
+] as const;
+
+const MODELS = ['BulleBrowser Pro', 'BulleBrowser Balanced', 'BulleBrowser Fastest'] as const;
 
 const START: State = {
   address: '',
   page: 'blank',
-  cursor: { x: 82, y: 86 },
+  cursor: { x: 50, y: 42 },
   click: false,
   composer: '',
   typing: false,
@@ -63,27 +73,21 @@ const START: State = {
 
 export function AgentPanel() {
   const [s, setS] = useState<State>(START);
+  const [voice, setVoice] = useState<Voice>('idle');
+  const [menuOpen, setMenuOpen] = useState(false);
   const timers = useRef<number[]>([]);
 
-  // ---- Conversation auto-scroll + "jump to latest" -------------------------
   const feedRef = useRef<HTMLDivElement | null>(null);
   const [atBottom, setAtBottom] = useState(true);
 
   const onFeedScroll = () => {
     const el = feedRef.current;
     if (!el) return;
-    const near = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
-    setAtBottom(near);
+    setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 24);
   };
-
   const jumpToLatest = () => {
-    const el = feedRef.current;
-    if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight, behavior: 'smooth' });
   };
-
-  // Keep the newest message in view as the agent streams, but only if the
-  // viewer hasn't scrolled up to read (then the pointer button takes over).
   useEffect(() => {
     const el = feedRef.current;
     if (el && atBottom) el.scrollTop = el.scrollHeight;
@@ -98,13 +102,13 @@ export function AgentPanel() {
       setS({
         address: 'en.wikipedia.org/wiki/Mount_Fuji',
         page: 'article',
-        cursor: { x: 82, y: 86 },
+        cursor: { x: 50, y: 42 },
         click: false,
         composer: '',
         typing: false,
         feed: [
           { kind: 'user', text: 'Find the tallest mountain in Japan and its height' },
-          { kind: 'activity', text: 'Read en.wikipedia.org/wiki/Mount_Fuji', done: true },
+          { kind: 'activity', steps: ['Opening google.com', 'Reading the results', 'Reading en.wikipedia.org/wiki/Mount_Fuji'], done: true },
           { kind: 'answer', html: 'fuji' },
         ],
       });
@@ -120,96 +124,121 @@ export function AgentPanel() {
       timers.current.push(window.setTimeout(() => !cancelled && fn(), t));
     };
 
-    // Append a feed entry, marking any earlier activity as complete.
-    const push = (item: Feed) =>
-      setS((p) => ({
-        ...p,
-        feed: [
-          ...p.feed.map((f) => (f.kind === 'activity' ? { ...f, done: true } : f)),
-          item,
-        ],
-      }));
+    const pushUser = (text: string) =>
+      setS((p) => ({ ...p, feed: [...p.feed, { kind: 'user', text }] }));
+    const startActivity = (step: string) =>
+      setS((p) => ({ ...p, feed: [...p.feed, { kind: 'activity', steps: [step], done: false }] }));
+    const addStep = (step: string) =>
+      setS((p) => {
+        const feed = [...p.feed];
+        for (let i = feed.length - 1; i >= 0; i--) {
+          const f = feed[i];
+          if (f && f.kind === 'activity') {
+            feed[i] = { ...f, steps: [...f.steps, step] };
+            break;
+          }
+        }
+        return { ...p, feed };
+      });
+    const finishActivity = () =>
+      setS((p) => {
+        const feed = p.feed.map((f) => (f.kind === 'activity' ? { ...f, done: true } : f));
+        return { ...p, feed };
+      });
+    const pushAnswer = (html: 'fuji' | 'notes') =>
+      setS((p) => ({ ...p, feed: [...p.feed, { kind: 'answer', html }] }));
 
-    // Reveal `text` into a string field one character at a time.
-    const typeField = (
-      key: 'address' | 'composer',
-      text: string,
-      startAt: number,
-      totalMs: number,
-    ) => {
+    const typeComposer = (text: string, startAt: number, totalMs: number) => {
       const per = Math.max(18, totalMs / Math.max(1, text.length));
       for (let i = 1; i <= text.length; i++) {
-        at(startAt + i * per, () => setS((p) => ({ ...p, [key]: text.slice(0, i) })));
+        at(startAt + i * per, () => setS((p) => ({ ...p, composer: text.slice(0, i) })));
       }
       return startAt + text.length * per;
+    };
+    const typeAddress = (text: string, startAt: number, totalMs: number) => {
+      const per = Math.max(16, totalMs / Math.max(1, text.length));
+      for (let i = 1; i <= text.length; i++) {
+        at(startAt + i * per, () => setS((p) => ({ ...p, address: text.slice(0, i) })));
+      }
     };
 
     const run = () => {
       clearAll();
       setS(START);
-      // The feed is emptied on each loop, so re-pin to the bottom. Without this
-      // a visitor who scrolled up once left atBottom false forever: the panel
-      // never auto-followed again and the "jump to latest" arrow stuck around
-      // on a conversation that had already restarted.
+      setVoice('idle');
+      setMenuOpen(false);
       setAtBottom(true);
-      let t = 300;
+      let t = 500;
 
-      // ---- Turn 1: research -------------------------------------------------
+      // ---- Turn 1: research --------------------------------------------------
       at(t, () => setS((p) => ({ ...p, typing: true })));
-      t = typeField('composer', 'Find the tallest mountain in Japan and its height', t, 1600) + 200;
+      t = typeComposer('Find the tallest mountain in Japan and its height', t, 1700) + 250;
       at(t, () => {
-        push({ kind: 'user', text: 'Find the tallest mountain in Japan and its height' });
-        setS((p) => ({ ...p, composer: '', typing: false }));
+        pushUser('Find the tallest mountain in Japan and its height');
+        setS((p) => ({ ...p, composer: '', typing: false, cursor: { x: 44, y: 8 } }));
       });
-      t += 400;
+      t += 450;
 
-      at(t, () => {
-        push({ kind: 'activity', text: 'Starting…', done: false });
-        setS((p) => ({ ...p, cursor: { x: 42, y: 9 } }));
-      });
-      t += 600;
-      typeField('address', 'duckduckgo.com/?q=tallest mountain in japan', t, 900);
-      at(t, () => push({ kind: 'activity', text: 'Opening duckduckgo.com', done: false }));
-      t += 1100;
+      at(t, () => startActivity('Opening google.com'));
+      typeAddress('google.com/search?q=tallest mountain in japan', t, 900);
+      t += 1200;
       at(t, () => {
         setS((p) => ({ ...p, page: 'results' }));
-        push({ kind: 'activity', text: 'Reading the results', done: false });
+        addStep('Reading the results');
       });
-      t += 800;
-      at(t, () => setS((p) => ({ ...p, cursor: { x: 30, y: 44 } })));
-      t += 500;
+      t += 750;
+      at(t, () => setS((p) => ({ ...p, cursor: { x: 34, y: 40 } })));
+      t += 550;
       at(t, () => setS((p) => ({ ...p, click: true })));
       at(t + 220, () => setS((p) => ({ ...p, click: false })));
-      t += 500;
+      t += 520;
       at(t, () => {
         setS((p) => ({ ...p, page: 'article', address: 'en.wikipedia.org/wiki/Mount_Fuji' }));
-        push({ kind: 'activity', text: 'Reading en.wikipedia.org/wiki/Mount_Fuji', done: false });
+        addStep('Reading en.wikipedia.org/wiki/Mount_Fuji');
       });
-      t += 900;
-      at(t, () => setS((p) => ({ ...p, cursor: { x: 58, y: 56 } })));
+      t += 950;
+      at(t, () => setS((p) => ({ ...p, cursor: { x: 58, y: 58 } })));
+      t += 650;
+      at(t, () => addStep('Writing the answer'));
       t += 700;
-      at(t, () => push({ kind: 'activity', text: 'Writing the answer', done: false }));
-      t += 700;
-      at(t, () => push({ kind: 'answer', html: 'fuji' }));
-      t += 2200;
-
-      // ---- Turn 2: a follow-up, so the conversation grows and scrolls -------
-      at(t, () => setS((p) => ({ ...p, typing: true, cursor: { x: 82, y: 86 } })));
-      t = typeField('composer', 'Add it to my trip notes', t, 900) + 200;
       at(t, () => {
-        push({ kind: 'user', text: 'Add it to my trip notes' });
+        finishActivity();
+        pushAnswer('fuji');
+      });
+      t += 2400;
+
+      // ---- Turn 2: follow-up, so the conversation grows and scrolls ----------
+      at(t, () => setS((p) => ({ ...p, typing: true })));
+      t = typeComposer('Add it to my trip notes', t, 900) + 200;
+      at(t, () => {
+        pushUser('Add it to my trip notes');
         setS((p) => ({ ...p, composer: '', typing: false }));
       });
       t += 400;
       at(t, () => {
         setS((p) => ({ ...p, page: 'notes', address: 'notes.local/trip' }));
-        push({ kind: 'activity', text: 'Opening Trip notes', done: false });
+        startActivity('Opening Trip notes');
       });
-      t += 900;
-      at(t, () => push({ kind: 'activity', text: 'Adding the entry', done: false }));
-      t += 900;
-      at(t, () => push({ kind: 'answer', html: 'notes' }));
+      t += 950;
+      at(t, () => addStep('Adding the entry'));
+      t += 950;
+      at(t, () => {
+        finishActivity();
+        pushAnswer('notes');
+      });
+      t += 2400;
+
+      // ---- Showcase the composer surfaces, one after another -----------------
+      at(t, () => setMenuOpen(true)); // "+" attachment menu
+      t += 2200;
+      at(t, () => setMenuOpen(false));
+      t += 400;
+      at(t, () => setVoice('once')); // mic: "Listening… speak, then Send"
       t += 2600;
+      at(t, () => setVoice('continuous')); // Voice Mode: "speak your commands"
+      t += 2900;
+      at(t, () => setVoice('idle'));
+      t += 500;
 
       at(t, run); // loop
     };
@@ -221,38 +250,30 @@ export function AgentPanel() {
     };
   }, []);
 
+  const composing = s.typing;
+
   return (
-    <div className="flex flex-col overflow-hidden rounded-2xl border border-line bg-surface-light shadow-xl ring-1 ring-black/5">
-      {/* Panel header */}
-      <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
-        <div className="flex items-center gap-2 text-sm font-semibold text-ink-primary">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={asset('/logo.svg')} alt="" className="h-5 w-5 rounded" draggable={false} />
-          BulleBrowser Agent
+    <div className="overflow-hidden rounded-2xl border border-line bg-surface-light shadow-xl ring-1 ring-black/5">
+      {/* Window toolbar: traffic lights + address bar, like the app's top bar. */}
+      <div className="flex items-center gap-2 bg-surface-dark px-3 py-2">
+        <span className="h-2.5 w-2.5 rounded-full bg-red-400/80" />
+        <span className="h-2.5 w-2.5 rounded-full bg-yellow-300/80" />
+        <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/80" />
+        <div className="ml-2 flex h-6 flex-1 items-center gap-1.5 truncate rounded-md bg-white/10 px-2.5 text-[11px] text-white/85">
+          <svg viewBox="0 0 24 24" className="h-3 w-3 shrink-0 text-white/60" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path d="M7 11V8a5 5 0 0 1 10 0v3" strokeLinecap="round" />
+            <rect x="5" y="11" width="14" height="9" rx="2" />
+          </svg>
+          <span className="truncate">{s.address || 'Search or enter address'}</span>
+          {s.address && s.page === 'blank' && <span className="animate-pulse">|</span>}
         </div>
-        <span className="inline-flex items-center gap-1.5 text-xs text-ink-secondary">
-          <span
-            className="h-1.5 w-1.5 rounded-full bg-emerald-500"
-            style={{ animation: 'soft-pulse 1.8s ease-in-out infinite' }}
-          />
-          Live
-        </span>
       </div>
 
-      {/* Browser sub-pane the agent drives */}
-      <div className="border-b border-line">
-        <div className="flex items-center gap-1.5 bg-surface-dark px-3 py-1.5">
-          <span className="h-2 w-2 rounded-full bg-red-400/80" />
-          <span className="h-2 w-2 rounded-full bg-yellow-300/80" />
-          <span className="h-2 w-2 rounded-full bg-emerald-400/80" />
-          <div className="ml-2 flex h-5 flex-1 items-center truncate rounded bg-white/10 px-2 text-[10px] text-white/80">
-            {s.address || 'Search or enter address'}
-            {s.address && s.page === 'blank' && <span className="ml-0.5 animate-pulse">|</span>}
-          </div>
-        </div>
-        <div className="relative h-[148px] overflow-hidden p-3 text-[11px]">
+      {/* Body: browser pane (left) + AI panel (right), as the docked app shows. */}
+      <div className="flex flex-col sm:h-[476px] sm:flex-row">
+        {/* Browser pane the agent drives. */}
+        <div className="relative h-[150px] overflow-hidden border-b border-line bg-surface-light p-3 text-[11px] sm:h-auto sm:flex-1 sm:border-b-0 sm:border-r">
           <PageContent page={s.page} />
-          {/* the agent cursor moving across the page */}
           <div
             className="pointer-events-none absolute z-10 transition-all duration-500 ease-out"
             style={{ left: `${s.cursor.x}%`, top: `${s.cursor.y}%` }}
@@ -265,103 +286,244 @@ export function AgentPanel() {
             </svg>
           </div>
         </div>
-      </div>
 
-      {/* Conversation feed */}
-      <div className="relative">
-        <div
-          ref={feedRef}
-          onScroll={onFeedScroll}
-          className="h-[224px] space-y-2 overflow-y-auto px-4 py-3 text-[12px] leading-relaxed"
-        >
-          {s.feed.length === 0 && (
-            <p className="text-ink-secondary">Ask BulleBrowser to do something…</p>
-          )}
-          {s.feed.map((f, i) => (
-            <FeedRow key={i} item={f} />
-          ))}
-          {s.typing && s.composer && (
-            <div className="ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3 py-1.5 text-white">
-              {s.composer}
-              <span className="ml-0.5 animate-pulse">|</span>
+        {/* The AI panel — mirrors apps/desktop AiPanel.tsx. */}
+        <aside className="relative flex h-[440px] w-full flex-col bg-surface-light sm:h-auto sm:w-[300px]">
+          {voice !== 'idle' && <VoiceOverlay mode={voice} onClose={() => setVoice('idle')} />}
+
+          <header className="flex items-center justify-between gap-2 px-3 py-2.5">
+            <div className="text-[13px] font-semibold tracking-tight text-ink-primary">
+              BulleBrowser Agent
             </div>
-          )}
-        </div>
+            <div className="flex items-center gap-1 text-xs text-ink-secondary">
+              <span className="rounded-md px-2 py-1">History</span>
+              <span className="rounded-md px-2 py-1">New chat</span>
+            </div>
+          </header>
 
-        {/* Pointer arrow → jump to the latest message. */}
-        {!atBottom && (
-          <button
-            type="button"
-            onClick={jumpToLatest}
-            aria-label="Jump to latest message"
-            className="absolute bottom-3 right-3 inline-flex h-9 w-9 items-center justify-center rounded-full border border-line bg-surface-light text-ink-primary shadow-md transition-transform hover:scale-105"
-          >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 5v14M6 13l6 6 6-6" />
-            </svg>
-          </button>
-        )}
+          {/* Skills + model selectors (real <select>s, as in the app). */}
+          <div className="flex items-center gap-3 px-3 pb-2 text-xs">
+            <select
+              defaultValue=""
+              aria-label="Skill"
+              className="min-w-0 flex-1 rounded-md bg-transparent py-1 text-ink-secondary transition-colors hover:text-ink-primary focus:outline-none"
+            >
+              <option value="">Skills: free chat</option>
+              {SKILLS.map((sk) => (
+                <option key={sk.id} value={sk.id}>{sk.label}</option>
+              ))}
+            </select>
+            <select
+              defaultValue={MODELS[0]}
+              aria-label="Model"
+              className="rounded-md bg-transparent py-1 text-ink-secondary transition-colors hover:text-ink-primary focus:outline-none"
+            >
+              {MODELS.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Conversation. */}
+          <div className="relative flex flex-1 flex-col overflow-hidden">
+            <div ref={feedRef} onScroll={onFeedScroll} className="flex-1 overflow-y-auto px-4 py-4">
+              {s.feed.length === 0 ? (
+                <EmptyState />
+              ) : (
+                s.feed.map((f, i) => <FeedRow key={i} item={f} />)
+              )}
+            </div>
+            {!atBottom && (
+              <button
+                type="button"
+                onClick={jumpToLatest}
+                aria-label="Jump to latest message"
+                className="absolute bottom-2 right-3 inline-flex h-8 w-8 items-center justify-center rounded-full border border-line bg-white text-ink-primary shadow-md transition-transform hover:scale-105"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 5v14M6 13l6 6 6-6" />
+                </svg>
+              </button>
+            )}
+          </div>
+
+          {/* Composer. */}
+          <div className="border-t border-line/60 p-2.5">
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <div className={`halo rounded-xl ${composing ? 'is-active' : ''}`}>
+                  <textarea
+                    readOnly
+                    rows={3}
+                    aria-label="Ask BulleBrowser"
+                    value={s.composer}
+                    placeholder="Ask BulleBrowser to do something. It will browse, read, compare, and report back."
+                    className="w-full resize-none rounded-xl border border-line bg-surface-light px-3 py-2 text-[13px] leading-snug text-ink-primary outline-none placeholder:text-ink-secondary"
+                  />
+                </div>
+              </div>
+              <span
+                className={`inline-flex h-9 items-center rounded px-3 text-sm font-medium text-white ${
+                  s.composer ? 'bg-primary' : 'bg-line'
+                }`}
+              >
+                Send
+              </span>
+            </div>
+
+            {/* Control row: "+" menu, brand-mark home, mic, Voice Mode. */}
+            <div className="mt-2 flex items-center gap-1">
+              <AttachMenu open={menuOpen} onToggle={() => setMenuOpen((v) => !v)} />
+
+              <Link
+                href="/"
+                aria-label="Open bullebrowser.com"
+                title="bullebrowser.com"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-muted"
+              >
+                <svg viewBox="0 0 64 64" className="h-5 w-5" aria-hidden>
+                  <rect x="4" y="4" width="56" height="56" rx="16" fill="#20BAD1" />
+                  <circle cx="26" cy="30" r="12" fill="none" stroke="#fff" strokeWidth="5" />
+                  <circle cx="42" cy="40" r="6" fill="#fff" />
+                </svg>
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => setVoice('once')}
+                aria-label="Voice input"
+                title="Speak a prompt"
+                className={`inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
+                  voice === 'once' ? 'bg-primary/10 text-primary' : 'text-ink-secondary hover:bg-surface-muted hover:text-ink-primary'
+                }`}
+              >
+                <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="9" y="3" width="6" height="11" rx="3" />
+                  <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+                </svg>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setVoice((v) => (v === 'continuous' ? 'idle' : 'continuous'))}
+                aria-label="Voice Mode"
+                aria-pressed={voice === 'continuous'}
+                title="Continuous Voice Mode"
+                className={`inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
+                  voice === 'continuous' ? 'bg-primary/10 text-primary' : 'text-ink-secondary hover:bg-surface-muted hover:text-ink-primary'
+                }`}
+              >
+                <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round">
+                  <path d="M4 11v2M8 8v8M12 5v14M16 8v8M20 11v2" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </aside>
       </div>
-
-      {/* Composer with halo + attachment menu + brand mark */}
-      <Composer typing={s.typing} />
     </div>
   );
 }
 
+// ---- Conversation rows ------------------------------------------------------
+
 function FeedRow({ item }: { item: Feed }) {
   if (item.kind === 'user') {
     return (
-      <div className="ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3 py-1.5 text-white">
-        {item.text}
+      <div className="mb-5 flex justify-end">
+        <div className="max-w-[85%] rounded-2xl bg-primary px-3.5 py-2 text-[13px] leading-relaxed text-white">
+          {item.text}
+        </div>
       </div>
     );
   }
-  if (item.kind === 'activity') {
-    return (
-      <div className="flex items-center gap-2 text-ink-secondary">
-        {item.done ? (
-          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-emerald-500" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4 12.5 9 17.5 20 6.5" />
-          </svg>
-        ) : (
-          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" style={{ animation: 'soft-pulse 1.2s ease-in-out infinite' }} />
-        )}
-        <span className="truncate">{item.text}</span>
-      </div>
-    );
-  }
-  // answer
+  if (item.kind === 'activity') return <ActivityFeed steps={item.steps} done={item.done} />;
+  // answer — plain prose, no card, like the app's assistant messages.
   return (
-    <div className="w-fit max-w-[92%] rounded-2xl rounded-bl-sm bg-surface-muted px-3 py-2 text-ink-primary">
+    <div className="mb-5 text-[13px] leading-relaxed text-ink-primary">
       {item.html === 'fuji' ? (
         <>
-          The tallest mountain in Japan is <span className="font-semibold">Mount Fuji</span>, at{' '}
-          <span className="font-semibold">3,776&nbsp;m</span> (12,388&nbsp;ft).
-          <span className="mt-1 block text-[10px] text-ink-secondary">Source: en.wikipedia.org/wiki/Mount_Fuji</span>
+          The tallest mountain in Japan is <strong>Mount Fuji</strong>, at{' '}
+          <strong>3,776&nbsp;m</strong> (12,388&nbsp;ft).
+          <span className="mt-1 block text-[11px] text-ink-secondary">
+            Source: en.wikipedia.org/wiki/Mount_Fuji
+          </span>
         </>
       ) : (
         <>
-          Added <span className="font-semibold">“Mount Fuji, 3,776&nbsp;m”</span> to your Trip notes.
+          Added <strong>“Mount Fuji, 3,776&nbsp;m”</strong> to your Trip notes.
         </>
       )}
     </div>
   );
 }
 
-// ---- Composer ---------------------------------------------------------------
+// One quiet, openable line of what the agent is doing — mirrors the app's
+// ActivityFeed: a pulsing dot while running, a check when done, a step count.
+function ActivityFeed({ steps, done }: { steps: string[]; done: boolean }) {
+  const [open, setOpen] = useState(false);
+  const summary = steps[steps.length - 1] ?? 'Working…';
+  return (
+    <div className="mb-5 overflow-hidden rounded-lg border border-line/50 bg-surface-muted/30 text-[12px]">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left"
+        aria-expanded={open}
+      >
+        {done ? (
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-emerald-500" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 12.5 9 17.5 20 6.5" />
+          </svg>
+        ) : (
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" style={{ animation: 'soft-pulse 1.2s ease-in-out infinite' }} />
+        )}
+        <span className="flex-1 truncate text-ink-primary">{summary}</span>
+        <span className="shrink-0 text-[11px] text-ink-secondary">
+          {steps.length} {steps.length === 1 ? 'step' : 'steps'}
+        </span>
+        <span className={`shrink-0 text-ink-secondary transition-transform ${open ? 'rotate-90' : ''}`}>›</span>
+      </button>
+      {open && (
+        <ol className="max-h-40 space-y-1.5 overflow-y-auto border-t border-line/40 px-3 py-2 text-ink-secondary">
+          {steps.map((st, i) => (
+            <li key={i} className="truncate">{st}</li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="space-y-5 pt-1 text-sm">
+      <p className="text-[15px] font-semibold tracking-tight text-ink-primary">
+        What can I help you browse?
+      </p>
+      <p className="text-[13px] leading-relaxed text-ink-secondary">
+        Describe a task and I&apos;ll use your live tabs to browse, read, compare, and report back.
+      </p>
+      <div className="space-y-3">
+        {SKILLS.map((sk) => (
+          <div key={sk.id}>
+            <div className="text-[13px] font-medium text-ink-primary">{sk.label}</div>
+            <div className="text-[12px] leading-relaxed text-ink-secondary">{sk.short}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---- "+" attachment menu — mirrors apps/desktop AttachMenu.tsx --------------
 
 const ATTACH: { key: string; label: string; note: string; icon: React.ReactNode }[] = [
-  {
-    key: 'upload',
-    label: 'Upload your file',
-    note: 'Session files are retained for 8 days',
-    icon: <path d="M12 16V4m0 0L7 9m5-5 5 5M5 20h14" />,
-  },
+  { key: 'upload', label: 'Upload your file', note: 'Session files are retained for 8 days', icon: <path d="M12 16V4m0 0L7 9m5-5 5 5M5 20h14" /> },
   {
     key: 'screenshot',
     label: 'Screenshot',
-    note: 'Capture the current page for the agent',
+    note: 'Capture the current page',
     icon: (
       <>
         <rect x="3" y="6" width="18" height="13" rx="2" />
@@ -370,235 +532,94 @@ const ATTACH: { key: string; label: string; note: string; icon: React.ReactNode 
       </>
     ),
   },
-  {
-    key: 'projects',
-    label: 'Projects',
-    note: 'Attach a project folder so the agent knows the task',
-    icon: <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2.5h9A1.5 1.5 0 0 1 21 10v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18z" />,
-  },
+  { key: 'projects', label: 'Projects', note: 'Attach a project folder', icon: <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2.5h9A1.5 1.5 0 0 1 21 10v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18z" /> },
   {
     key: 'control',
     label: 'Control Browser',
-    note: 'Let the agent drive tabs and complete tasks',
+    note: 'Let the agent drive your tabs',
     icon: (
       <>
         <circle cx="12" cy="12" r="9" />
-        <path d="M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18M3.2 9h17.6M3.2 15h17.6" />
+        <path d="M3.2 9h17.6M3.2 15h17.6M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
       </>
     ),
   },
 ];
 
-function Composer({ typing }: { typing: boolean }) {
-  const [open, setOpen] = useState(false);
-  const [note, setNote] = useState<string | null>(null);
-  const [voice, setVoice] = useState<'idle' | 'listening' | 'voice'>('idle');
-  const wrapRef = useRef<HTMLDivElement | null>(null);
-
-  // Close the popover on any outside click.
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
-  }, [open]);
-
+function AttachMenu({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   return (
-    <div className="relative border-t border-line p-3">
-      {/* Hands-free Voice Mode overlays the whole composer footer, as in the app. */}
-      {voice === 'voice' && <VoiceOverlay onStop={() => setVoice('idle')} />}
-
-      {/* Input area: the halo'd field, or the mic's "listening" state. The halo
-          rides on the wrapper: active while the agent composes (`is-active`) or
-          the visitor focuses the field (`:focus-within`). */}
-      {voice === 'listening' ? (
-        <ListeningBar onSend={() => setVoice('idle')} onCancel={() => setVoice('idle')} />
-      ) : (
-        <div className={`halo rounded-xl ${typing ? 'is-active' : ''}`}>
-          <div className="flex items-center gap-2 rounded-xl border border-line bg-surface-light px-2 py-1.5">
-            <input
-              type="text"
-              readOnly
-              aria-label="Ask BulleBrowser"
-              placeholder="Ask BulleBrowser to do something…"
-              className="min-w-0 flex-1 bg-transparent px-1 text-[12px] text-ink-primary outline-none placeholder:text-ink-secondary"
-            />
-          </div>
+    <div className="relative">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-label="Add attachment"
+        aria-expanded={open}
+        title="Attach files, a screenshot, or a project"
+        className={`inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${
+          open ? 'border-primary bg-primary/10 text-primary' : 'border-line text-ink-secondary hover:text-ink-primary'
+        }`}
+      >
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute bottom-10 left-0 z-40 w-64 overflow-hidden rounded-xl border border-line bg-white p-1 text-ink-primary shadow-xl">
+          {ATTACH.map((a) => (
+            <div key={a.key} className="flex w-full items-start gap-2.5 rounded-md px-2.5 py-2 text-left hover:bg-surface-muted">
+              <svg viewBox="0 0 24 24" className="mt-0.5 h-4 w-4 shrink-0 text-primary" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                {a.icon}
+              </svg>
+              <span className="min-w-0">
+                <span className="block text-[12px] font-medium">{a.label}</span>
+                <span className="block text-[11px] text-ink-secondary">{a.note}</span>
+              </span>
+            </div>
+          ))}
         </div>
       )}
+    </div>
+  );
+}
 
-      {/* Control row: "+" menu, brand mark, mic, Voice Mode, and send. */}
-      <div ref={wrapRef} className="relative mt-2 flex items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-label="Add attachment"
-          aria-expanded={open}
-          className={`inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${
-            open ? 'border-primary bg-primary/10 text-primary' : 'border-line text-ink-secondary hover:text-ink-primary'
-          }`}
-        >
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-        </button>
+// ---- Voice overlay — mirrors apps/desktop VoiceOverlay.tsx -------------------
 
-        {/* Brand mark → home. */}
-        <Link
-          href="/"
-          aria-label="BulleBrowser home"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-line hover:border-primary/40"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={asset('/logo.svg')} alt="" className="h-5 w-5 rounded" draggable={false} />
-        </Link>
-
-        {/* Mic → a single "listening" capture. */}
-        <button
-          type="button"
-          onClick={() => {
-            setVoice('listening');
-            setOpen(false);
-          }}
-          aria-label="Voice message"
-          aria-pressed={voice === 'listening'}
-          className={`inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${
-            voice === 'listening'
-              ? 'border-primary bg-primary/10 text-primary'
-              : 'border-line text-ink-secondary hover:text-ink-primary'
-          }`}
-        >
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-            <rect x="9" y="3" width="6" height="11" rx="3" />
-            <path d="M6 11a6 6 0 0 0 12 0M12 17v4" />
-          </svg>
-        </button>
-
-        {/* Soundwave → hands-free Voice Mode. */}
-        <button
-          type="button"
-          onClick={() => {
-            setVoice('voice');
-            setOpen(false);
-          }}
-          aria-label="Voice mode"
-          aria-pressed={voice === 'voice'}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-line text-ink-secondary transition-colors hover:text-ink-primary"
-        >
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
-            <path d="M4 10v4M8 6v12M12 3v18M16 6v12M20 10v4" />
-          </svg>
-        </button>
-
-        <div className="ml-auto truncate text-[11px] text-ink-secondary">{note}</div>
-
-        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-white">
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M5 12h14M13 6l6 6-6 6" />
-          </svg>
+function VoiceOverlay({ mode, onClose }: { mode: 'once' | 'continuous'; onClose: () => void }) {
+  const bars = [0, 0.18, 0.36, 0.12, 0.28, 0.06, 0.22];
+  return (
+    <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-surface-light/95 backdrop-blur-sm">
+      <div className="flex w-[80%] max-w-xs flex-col items-center gap-6 rounded-2xl border border-line/40 bg-white p-6 shadow-xl">
+        <span className={`inline-flex items-center gap-[3px] ${mode === 'continuous' ? 'text-primary' : 'text-ink-primary'}`} aria-hidden>
+          {bars.map((d, i) => (
+            <span
+              key={i}
+              className="eq-bar block w-[3px] rounded-full bg-current"
+              style={{ height: 26, transformOrigin: 'center', animation: `eq-bar 0.9s ease-in-out ${d}s infinite` }}
+            />
+          ))}
         </span>
 
-        {/* "+" popover, Comet-style attachment menu. Each item names where the
-            capability actually runs; the whole panel links into the app. */}
-        {open && (
-          <div className="absolute bottom-11 left-0 z-20 w-64 overflow-hidden rounded-xl border border-line bg-surface-light p-1 shadow-xl">
-            {ATTACH.map((a) => (
-              <button
-                key={a.key}
-                type="button"
-                onClick={() => {
-                  setNote(a.label);
-                  setOpen(false);
-                }}
-                className="flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-surface-muted"
-              >
-                <svg viewBox="0 0 24 24" className="mt-0.5 h-4 w-4 shrink-0 text-primary" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
-                  {a.icon}
-                </svg>
-                <span className="min-w-0">
-                  <span className="block text-[12px] font-medium text-ink-primary">{a.label}</span>
-                  <span className="block text-[11px] text-ink-secondary">{a.note}</span>
-                </span>
-              </button>
-            ))}
-            <Link
-              href="/download"
-              className="mt-1 block rounded-lg bg-surface-muted px-2.5 py-2 text-center text-[11px] font-medium text-primary hover:bg-primary/10"
-            >
-              These run in the BulleBrowser app, get it →
-            </Link>
-          </div>
-        )}
+        <div className="min-h-[2.5rem] px-2 text-center text-[13px] text-ink-secondary">
+          {mode === 'continuous' && (
+            <span className="mb-1 flex items-center justify-center gap-1.5 text-primary">
+              <span className="h-1.5 w-1.5 rounded-full bg-primary" style={{ animation: 'soft-pulse 1.4s ease-in-out infinite' }} />
+              Voice Mode
+            </span>
+          )}
+          {mode === 'continuous' ? 'Listening… speak your commands' : 'Listening… speak, then Send'}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {mode === 'once' && (
+            <button type="button" onClick={onClose} className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-white hover:bg-primary-hover">
+              Send
+            </button>
+          )}
+          <button type="button" onClick={onClose} className="rounded-md border border-line px-4 py-1.5 text-sm text-ink-secondary hover:bg-surface-muted">
+            {mode === 'continuous' ? 'Stop Voice Mode' : 'Cancel'}
+          </button>
+        </div>
       </div>
-    </div>
-  );
-}
-
-// ---- Voice controls (listening + hands-free Voice Mode) ---------------------
-
-// A small animated equalizer. Bars scale on the CSS `eq-bar` keyframe and hold
-// a steady height for anyone who prefers reduced motion.
-function Equalizer({ height = 16 }: { height?: number }) {
-  const delays = [0, 0.18, 0.36, 0.12, 0.28, 0.06, 0.22];
-  return (
-    <span className="inline-flex items-center gap-[3px]" aria-hidden>
-      {delays.map((d, i) => (
-        <span
-          key={i}
-          className="eq-bar block w-[3px] rounded-full bg-current"
-          style={{ height, transformOrigin: 'center', animation: `eq-bar 0.9s ease-in-out ${d}s infinite` }}
-        />
-      ))}
-    </span>
-  );
-}
-
-// Mic capture: replaces the input with a listening row and Send / Cancel.
-function ListeningBar({ onSend, onCancel }: { onSend: () => void; onCancel: () => void }) {
-  return (
-    <div className="flex items-center gap-3 rounded-xl border border-primary/40 bg-primary/5 px-3 py-2">
-      <span className="text-primary">
-        <Equalizer />
-      </span>
-      <span className="flex-1 text-[12px] text-ink-primary">
-        <span className="font-medium">Listening…</span> speak, then Send
-      </span>
-      <button
-        type="button"
-        onClick={onCancel}
-        className="rounded-full px-2.5 py-1 text-[11px] text-ink-secondary transition-colors hover:text-ink-primary"
-      >
-        Cancel
-      </button>
-      <button
-        type="button"
-        onClick={onSend}
-        className="rounded-full bg-primary px-3 py-1 text-[11px] font-medium text-white"
-      >
-        Send
-      </button>
-    </div>
-  );
-}
-
-// Hands-free Voice Mode: a full overlay over the composer footer.
-function VoiceOverlay({ onStop }: { onStop: () => void }) {
-  return (
-    <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 rounded-b-2xl bg-surface-light/95 backdrop-blur">
-      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">Voice Mode</span>
-      <span className="text-primary">
-        <Equalizer height={26} />
-      </span>
-      <span className="text-[12px] text-ink-secondary">Listening… speak your commands</span>
-      <button
-        type="button"
-        onClick={onStop}
-        className="mt-1 rounded-full border border-line px-3 py-1 text-[11px] font-medium text-ink-primary transition-colors hover:border-primary/50"
-      >
-        Stop Voice Mode
-      </button>
     </div>
   );
 }
@@ -619,11 +640,17 @@ function PageContent({ page }: { page: Page }) {
   if (page === 'results') {
     return (
       <div className="space-y-2">
-        <div className="h-4 w-1/2 rounded bg-surface-muted" />
+        <div className="flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-[10px] text-ink-secondary">
+          <svg viewBox="0 0 24 24" className="h-3 w-3 text-ink-secondary" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m21 21-4.3-4.3" />
+          </svg>
+          tallest mountain in japan
+        </div>
         {['Mount Fuji - Wikipedia', 'List of mountains of Japan', 'Tallest peaks in Japan'].map((r, i) => (
           <div key={r} className={`rounded px-1 py-0.5 ${i === 0 ? 'bg-primary/5' : ''}`}>
             <div className="text-[10px] font-medium text-primary">{r}</div>
-            <div className="text-[9px] text-ink-secondary">en.wikipedia.org, a concise overview and key facts…</div>
+            <div className="text-[9px] text-ink-secondary">en.wikipedia.org · a concise overview and key facts…</div>
           </div>
         ))}
       </div>
