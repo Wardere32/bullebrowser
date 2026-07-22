@@ -25,7 +25,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 
-type Page = 'blank' | 'results' | 'article' | 'notes';
+type Page = 'blank' | 'fundResults' | 'grant' | 'careers';
 type Voice = 'idle' | 'once' | 'continuous';
 
 interface Cursor {
@@ -38,7 +38,7 @@ interface Cursor {
 type Feed =
   | { kind: 'user'; text: string }
   | { kind: 'activity'; steps: string[]; done: boolean }
-  | { kind: 'answer'; html: 'fuji' | 'notes' };
+  | { kind: 'answer'; html: 'funding' | 'compliance' };
 
 interface State {
   address: string;
@@ -100,16 +100,16 @@ export function AgentPanel() {
       window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     if (reduce) {
       setS({
-        address: 'en.wikipedia.org/wiki/Mount_Fuji',
-        page: 'article',
+        address: 'grants.gov/search',
+        page: 'grant',
         cursor: { x: 50, y: 42 },
         click: false,
         composer: '',
         typing: false,
         feed: [
-          { kind: 'user', text: 'Find the tallest mountain in Japan and its height' },
-          { kind: 'activity', steps: ['Opening google.com', 'Reading the results', 'Reading en.wikipedia.org/wiki/Mount_Fuji'], done: true },
-          { kind: 'answer', html: 'fuji' },
+          { kind: 'user', text: 'Find grant funding we could apply for this quarter' },
+          { kind: 'activity', steps: ['Opening google.com', 'Reading the results', 'Reading grants.gov'], done: true },
+          { kind: 'answer', html: 'funding' },
         ],
       });
       return;
@@ -145,7 +145,7 @@ export function AgentPanel() {
         const feed = p.feed.map((f) => (f.kind === 'activity' ? { ...f, done: true } : f));
         return { ...p, feed };
       });
-    const pushAnswer = (html: 'fuji' | 'notes') =>
+    const pushAnswer = (html: 'funding' | 'compliance') =>
       setS((p) => ({ ...p, feed: [...p.feed, { kind: 'answer', html }] }));
 
     const typeComposer = (text: string, startAt: number, totalMs: number) => {
@@ -170,63 +170,67 @@ export function AgentPanel() {
       setAtBottom(true);
       let t = 500;
 
-      // ---- Turn 1: research --------------------------------------------------
+      // ---- Turn 1: find funding ---------------------------------------------
       at(t, () => setS((p) => ({ ...p, typing: true })));
-      t = typeComposer('Find the tallest mountain in Japan and its height', t, 1700) + 250;
+      t = typeComposer('Find grant funding we could apply for this quarter', t, 1800) + 250;
       at(t, () => {
-        pushUser('Find the tallest mountain in Japan and its height');
+        pushUser('Find grant funding we could apply for this quarter');
         setS((p) => ({ ...p, composer: '', typing: false, cursor: { x: 44, y: 8 } }));
       });
       t += 450;
 
       at(t, () => startActivity('Opening google.com'));
-      typeAddress('google.com/search?q=tallest mountain in japan', t, 900);
-      t += 1200;
+      typeAddress('google.com/search?q=open grant funding for nonprofits', t, 950);
+      t += 1250;
       at(t, () => {
-        setS((p) => ({ ...p, page: 'results' }));
+        setS((p) => ({ ...p, page: 'fundResults' }));
         addStep('Reading the results');
       });
-      t += 750;
+      t += 800;
       at(t, () => setS((p) => ({ ...p, cursor: { x: 34, y: 40 } })));
       t += 550;
       at(t, () => setS((p) => ({ ...p, click: true })));
       at(t + 220, () => setS((p) => ({ ...p, click: false })));
       t += 520;
       at(t, () => {
-        setS((p) => ({ ...p, page: 'article', address: 'en.wikipedia.org/wiki/Mount_Fuji' }));
-        addStep('Reading en.wikipedia.org/wiki/Mount_Fuji');
+        setS((p) => ({ ...p, page: 'grant', address: 'grants.gov/search' }));
+        addStep('Reading grants.gov');
       });
       t += 950;
-      at(t, () => setS((p) => ({ ...p, cursor: { x: 58, y: 58 } })));
+      at(t, () => setS((p) => ({ ...p, cursor: { x: 58, y: 52 } })));
       t += 650;
       at(t, () => addStep('Writing the answer'));
       t += 700;
       at(t, () => {
         finishActivity();
-        pushAnswer('fuji');
+        pushAnswer('funding');
       });
-      t += 2400;
+      t += 2600;
 
-      // ---- Turn 2: follow-up, so the conversation grows and scrolls ----------
+      // ---- Turn 2: compliance review ----------------------------------------
       at(t, () => setS((p) => ({ ...p, typing: true })));
-      t = typeComposer('Add it to my trip notes', t, 900) + 200;
+      t = typeComposer('Review our careers page against our EEO checklist', t, 1500) + 200;
       at(t, () => {
-        pushUser('Add it to my trip notes');
-        setS((p) => ({ ...p, composer: '', typing: false }));
+        pushUser('Review our careers page against our EEO checklist');
+        setS((p) => ({ ...p, composer: '', typing: false, cursor: { x: 40, y: 10 } }));
       });
-      t += 400;
+      t += 450;
       at(t, () => {
-        setS((p) => ({ ...p, page: 'notes', address: 'notes.local/trip' }));
-        startActivity('Opening Trip notes');
+        setS((p) => ({ ...p, page: 'careers', address: 'example.org/careers' }));
+        startActivity('Opening the careers page');
       });
-      t += 950;
-      at(t, () => addStep('Adding the entry'));
-      t += 950;
+      t += 1000;
+      at(t, () => addStep('Reading the page'));
+      t += 850;
+      at(t, () => addStep('Checking each requirement'));
+      t += 850;
+      at(t, () => addStep('Writing the report'));
+      t += 700;
       at(t, () => {
         finishActivity();
-        pushAnswer('notes');
+        pushAnswer('compliance');
       });
-      t += 2400;
+      t += 2900;
 
       // ---- Showcase the composer surfaces, one after another -----------------
       at(t, () => setMenuOpen(true)); // "+" attachment menu
@@ -441,20 +445,43 @@ function FeedRow({ item }: { item: Feed }) {
   // answer — plain prose, no card, like the app's assistant messages.
   return (
     <div className="mb-5 text-[13px] leading-relaxed text-ink-primary">
-      {item.html === 'fuji' ? (
+      {item.html === 'funding' ? (
         <>
-          The tallest mountain in Japan is <strong>Mount Fuji</strong>, at{' '}
-          <strong>3,776&nbsp;m</strong> (12,388&nbsp;ft).
-          <span className="mt-1 block text-[11px] text-ink-secondary">
-            Source: en.wikipedia.org/wiki/Mount_Fuji
-          </span>
+          Found <strong>3 open grants</strong> that fit your programs. Best match:{' '}
+          <strong>Community Workforce Grant</strong> — up to <strong>$250,000</strong>,
+          deadline <strong>Aug&nbsp;15</strong>.
+          <span className="mt-1 block text-[11px] text-ink-secondary">Source: grants.gov</span>
         </>
       ) : (
         <>
-          Added <strong>“Mount Fuji, 3,776&nbsp;m”</strong> to your Trip notes.
+          Reviewed your careers page against the EEO checklist — <strong>3 of 4 pass</strong>:
+          <span className="mt-1.5 block space-y-1">
+            <CheckLine ok>Equal-opportunity statement</CheckLine>
+            <CheckLine ok>Reasonable-accommodation notice</CheckLine>
+            <CheckLine ok>Non-discriminatory language</CheckLine>
+            <CheckLine>Pay-range disclosure — add a salary range</CheckLine>
+          </span>
         </>
       )}
     </div>
+  );
+}
+
+// A pass/fail line for the compliance report, echoing the app's check marks.
+function CheckLine({ ok, children }: { ok?: boolean; children: React.ReactNode }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      {ok ? (
+        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-emerald-500" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 12.5 9 17.5 20 6.5" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-red-500" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M6 6l12 12M18 6 6 18" />
+        </svg>
+      )}
+      <span className="text-ink-primary">{children}</span>
+    </span>
   );
 }
 
@@ -637,7 +664,7 @@ function PageContent({ page }: { page: Page }) {
       </div>
     );
   }
-  if (page === 'results') {
+  if (page === 'fundResults') {
     return (
       <div className="space-y-2">
         <div className="flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-[10px] text-ink-secondary">
@@ -645,39 +672,48 @@ function PageContent({ page }: { page: Page }) {
             <circle cx="11" cy="11" r="7" />
             <path d="m21 21-4.3-4.3" />
           </svg>
-          tallest mountain in japan
+          open grant funding for nonprofits
         </div>
-        {['Mount Fuji - Wikipedia', 'List of mountains of Japan', 'Tallest peaks in Japan'].map((r, i) => (
-          <div key={r} className={`rounded px-1 py-0.5 ${i === 0 ? 'bg-primary/5' : ''}`}>
-            <div className="text-[10px] font-medium text-primary">{r}</div>
-            <div className="text-[9px] text-ink-secondary">en.wikipedia.org · a concise overview and key facts…</div>
+        {[
+          ['Grants.gov — Find grant opportunities', 'grants.gov · federal funding across agencies'],
+          ['SAM.gov — Assistance Listings', 'sam.gov · programs and eligibility'],
+          ['Foundation grants directory', 'candid.org · private & corporate funders'],
+        ].map(([title, sub], i) => (
+          <div key={title} className={`rounded px-1 py-0.5 ${i === 0 ? 'bg-primary/5' : ''}`}>
+            <div className="text-[10px] font-medium text-primary">{title}</div>
+            <div className="text-[9px] text-ink-secondary">{sub}</div>
           </div>
         ))}
       </div>
     );
   }
-  if (page === 'notes') {
+  if (page === 'grant') {
     return (
       <div className="space-y-1.5">
-        <div className="text-[12px] font-bold text-ink-primary">Trip notes</div>
+        <div className="text-[12px] font-bold text-ink-primary">Community Workforce Grant</div>
         <div className="h-2 w-3/4 rounded bg-surface-muted" />
         <div className="rounded border border-primary/30 bg-primary/5 px-2 py-1 text-[9.5px] text-ink-primary">
-          Mount Fuji, 3,776 m (12,388 ft)
+          <span className="text-ink-secondary">Award:</span>{' '}
+          <span className="font-semibold">up to $250,000</span>
+          <span className="text-ink-secondary"> · Deadline:</span>{' '}
+          <span className="font-semibold">Aug 15</span>
         </div>
         <div className="h-2 w-2/3 rounded bg-surface-muted" />
+        <div className="h-2 w-10/12 rounded bg-surface-muted" />
       </div>
     );
   }
+  // careers page under compliance review
   return (
     <div className="space-y-1.5">
-      <div className="text-[13px] font-bold text-ink-primary">Mount Fuji</div>
-      <div className="h-2 w-full rounded bg-surface-muted" />
-      <div className="h-2 w-11/12 rounded bg-surface-muted" />
+      <div className="text-[12px] font-bold text-ink-primary">Careers — open roles</div>
       <div className="rounded border border-line bg-surface-muted/40 px-2 py-1 text-[9.5px]">
-        <span className="text-ink-secondary">Elevation:</span>{' '}
-        <span className="font-semibold text-ink-primary">3,776 m (12,388 ft)</span>
+        <div className="font-semibold text-ink-primary">Program Coordinator</div>
+        <div className="text-ink-secondary">Full-time · Remote</div>
       </div>
-      <div className="h-2 w-10/12 rounded bg-surface-muted" />
+      <div className="h-2 w-11/12 rounded bg-surface-muted" />
+      <div className="text-[9px] text-ink-secondary">Equal Opportunity Employer</div>
+      <div className="h-2 w-2/3 rounded bg-surface-muted" />
     </div>
   );
 }

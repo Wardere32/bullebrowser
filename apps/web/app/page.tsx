@@ -12,7 +12,7 @@ export default function HomePage() {
   return (
     <>
       {/* Hero: copy alongside the live agent panel. */}
-      <section className="border-b border-line bg-gradient-to-b from-surface-muted to-surface-light">
+      <section className="border-b border-line bg-surface-light">
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-6 py-20 md:grid-cols-[1.05fr_1fr] md:py-28">
           <div>
             <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-line bg-surface-light px-3 py-1 text-xs tracking-wide text-ink-secondary">
