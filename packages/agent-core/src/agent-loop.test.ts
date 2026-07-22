@@ -399,10 +399,9 @@ describe('runAgent Claude tool-use loop', () => {
         context: makeContext(),
         onStep: () => {},
       }),
-    // The OpenAI engine is implemented but no longer offered in the picker,
-    // so it has no label of its own and falls back to the product name. What
-    // matters either way is that no vendor name reaches the user.
-    ).rejects.toThrow(/BulleBrowser AI needs its key/);
+    // The selectable OpenAI assistant has its own white-labelled name. The
+    // key error must still avoid exposing its underlying provider.
+    ).rejects.toThrow(/BulleBrowser Open needs its key/);
 
     await expect(
       runAgent({

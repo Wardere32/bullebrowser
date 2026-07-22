@@ -17,8 +17,7 @@ export function SettingsModal() {
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [keyError, setKeyError] = useState<string | null>(null);
   // Voice transcription (OpenAI Whisper) needs its own key, independent of the
-  // assistant. Every assistant is Anthropic, so without a dedicated field there
-  // was nowhere in the app to put an OpenAI key and voice silently had none.
+  // assistant selected for chat, so it remains available across providers.
   const [hasVoiceKey, setHasVoiceKey] = useState(false);
   const [voiceDraft, setVoiceDraft] = useState('');
   const [voiceSaving, setVoiceSaving] = useState(false);

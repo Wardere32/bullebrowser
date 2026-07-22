@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm';
 import { product } from '@bullebrowser/brand-tokens';
 import { skills, ASSISTANTS, providerFor, type ModelId } from '@bullebrowser/agent-core';
 import { useAgentStore } from '../state/agent-store.js';
+import { useBrowserStore } from '../state/browser-store.js';
 import { AGENT_PROMPT_EVENT } from '../lib/url.js';
 import { expandSlashCommand, SLASH_COMMANDS } from '../lib/slash-commands.js';
 import { useInputActivity } from '../hooks/useInputActivity.js';
@@ -44,6 +45,7 @@ const MODELS = ASSISTANTS;
 
 export function AiPanel() {
   const current = useAgentStore((s) => s.current);
+  const openSettings = useBrowserStore((s) => s.openSettings);
   const setCurrent = useAgentStore((s) => s.setCurrent);
   // The history list renders from this; without the selector the identifier is
   // simply undefined and opening History throws.
@@ -95,8 +97,19 @@ export function AiPanel() {
     void (async () => {
       const bridge = browserBridge();
       const settings: AppSettings = await bridge.settings.get();
-      setModel(settings.defaultModel);
-      setHasKey(await bridge.secrets.hasApiKey(providerFor(settings.defaultModel)));
+      const configuredProvider = providerFor(settings.defaultModel);
+      const [configuredKeyPresent, openAiKeyPresent] = await Promise.all([
+        bridge.secrets.hasApiKey(configuredProvider),
+        bridge.secrets.hasApiKey('openai'),
+      ]);
+      const effectiveSettings =
+        !configuredKeyPresent && configuredProvider !== 'openai' && openAiKeyPresent
+          ? await bridge.settings.set({ defaultModel: 'gpt-4o' })
+          : settings;
+      setModel(effectiveSettings.defaultModel);
+      setHasKey(
+        effectiveSettings.defaultModel === settings.defaultModel ? configuredKeyPresent : true,
+      );
       // Opening the app lands on a NEW session rather than resuming the last
       // one — a browser you just opened shouldn't drop you back into whatever
       // you were mid-way through, and the previous chats are a click away under
@@ -214,6 +227,19 @@ export function AiPanel() {
     textareaRef.current?.focus();
   };
 
+  // Whisper always uses the OpenAI credential, independently of the
+  // assistant selected for chat. Check it before the browser requests the
+  // microphone so a missing key sends the user straight to the right setting
+  // instead of recording speech that cannot be transcribed.
+  const startVoice = async (nextMode: 'once' | 'continuous') => {
+    const hasVoiceKey = await browserBridge().secrets.hasApiKey('openai');
+    if (!hasVoiceKey) {
+      openSettings();
+      return;
+    }
+    setVoiceMode(nextMode);
+  };
+
   // Open bullebrowser.com in a new tab — the brand-mark "home" affordance.
   const openHome = () => {
     void browserBridge().tabs.create(`https://${product.domain}`);
@@ -270,9 +296,15 @@ export function AiPanel() {
   // re-check — otherwise picking one whose key isn't saved would show a
   // working chat that fails auth on send.
   useEffect(() => {
+    let cancelled = false;
     void browserBridge()
       .secrets.hasApiKey(providerFor(model))
-      .then((present: boolean) => setHasKey(present));
+      .then((present: boolean) => {
+        if (!cancelled) setHasKey(present);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [model]);
 
   // The task the "Allow Access" prompt is asking about — always the message
@@ -406,7 +438,14 @@ export function AiPanel() {
       >
         {hasKey === false && <ConnectKey model={model} onConnected={() => setHasKey(true)} />}
         {hasKey === true && current && current.messages.length === 0 && (
-          <EmptyState />
+          <EmptyState
+            onAction={(text, skill) => {
+              setDraft(text);
+              setSkillId(skill ?? '');
+              textareaRef.current?.focus();
+            }}
+            onSpeak={() => void startVoice('once')}
+          />
         )}
         {hasKey === true &&
           current?.messages.map((m, i) => (
@@ -613,7 +652,7 @@ export function AiPanel() {
 
           <button
             type="button"
-            onClick={() => setVoiceMode('once')}
+            onClick={() => void startVoice('once')}
             aria-label="Voice input"
             title="Speak a prompt"
             className={`inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
@@ -628,7 +667,10 @@ export function AiPanel() {
 
           <button
             type="button"
-            onClick={() => setVoiceMode((v) => (v === 'continuous' ? null : 'continuous'))}
+            onClick={() => {
+              if (voiceMode === 'continuous') setVoiceMode(null);
+              else void startVoice('continuous');
+            }}
             aria-label="Voice Mode"
             aria-pressed={voiceMode === 'continuous'}
             title="Continuous Voice Mode"
@@ -897,25 +939,64 @@ function AllowAccess({ task }: { task: string }) {
   );
 }
 
-function EmptyState() {
+// Plain-language actions instead of a list of internal "skills". Each seeds the
+// composer with a natural-language prompt (and quietly selects the matching
+// skill under the hood, so the orchestration is unchanged); "Speak" opens the
+// same voice flow as the mic. The user thinks in verbs, not tools.
+function EmptyState({
+  onAction,
+  onSpeak,
+}: {
+  onAction: (text: string, skillId?: string) => void;
+  onSpeak: () => void;
+}) {
+  const ACTIONS: { label: string; text: string; skillId?: string; icon: React.ReactNode }[] = [
+    {
+      label: 'Summarize this page',
+      text: 'Summarize this page',
+      skillId: 'page_assistant',
+      icon: <path d="M4 6h16M4 12h16M4 18h10" />,
+    },
+    {
+      label: 'Compare options',
+      text: 'Compare the options across my open tabs and recommend one',
+      skillId: 'workflow_automator',
+      icon: <path d="M4 5h6v14H4zM14 5h6v14h-6z" />,
+    },
+    {
+      label: 'Act on this',
+      text: 'Act on this page: ',
+      skillId: 'site_navigator',
+      icon: <path d="M13 3 4 14h7l-1 7 9-11h-7z" />,
+    },
+  ];
+  const chip =
+    'flex items-center gap-2.5 rounded-lg border border-line px-3 py-2 text-left text-[13px] text-ink-primary transition-colors hover:border-primary/40 hover:bg-surface-muted';
   return (
-    <div className="space-y-6 pt-2 text-sm">
+    <div className="space-y-5 pt-1 text-sm">
       <p className="text-[15px] font-semibold tracking-tight text-ink-primary">
-        What can I help you browse?
+        What can I help you with?
       </p>
       <p className="leading-relaxed text-ink-secondary">
-        Describe a task and I&apos;ll use your live tabs to browse, read, compare,
-        and report back.
+        Ask in plain language — or pick one. I can read, compare, and act across
+        your tabs, and you can talk to me instead of typing.
       </p>
-      <div className="space-y-3">
-        {skills.map((s) => (
-          <div key={s.id}>
-            <div className="text-[13px] font-medium text-ink-primary">{s.label}</div>
-            <div className="text-xs leading-relaxed text-ink-secondary">
-              {s.shortDescription}
-            </div>
-          </div>
+      <div className="grid gap-2">
+        {ACTIONS.map((a) => (
+          <button key={a.label} type="button" onClick={() => onAction(a.text, a.skillId)} className={chip}>
+            <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-primary" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+              {a.icon}
+            </svg>
+            {a.label}
+          </button>
         ))}
+        <button type="button" onClick={onSpeak} className={chip}>
+          <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-primary" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+            <rect x="9" y="3" width="6" height="11" rx="3" />
+            <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+          </svg>
+          Speak
+        </button>
       </div>
     </div>
   );

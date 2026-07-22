@@ -200,6 +200,7 @@ export function VoiceOverlay({
         mimeRef.current = pickMime();
         const ctx = new AudioContext();
         audioCtxRef.current = ctx;
+        await ctx.resume().catch(() => {});
         const analyser = ctx.createAnalyser();
         analyser.fftSize = 256;
         analyser.smoothingTimeConstant = 0.7;

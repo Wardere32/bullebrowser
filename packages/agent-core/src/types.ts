@@ -19,13 +19,12 @@ export function providerFor(model: ModelId): ProviderId {
 // no vendor names anywhere client-facing — so the underlying model can be
 // swapped or upgraded without the product's surface changing. The `provider`
 // field is what actually routes the call; `label` is the only part a user sees.
-// Note: the OpenAI provider stays implemented and tested (openai-loop.ts), it
-// is simply not offered here. Adding an entry with provider 'openai' is all it
-// takes to surface it again.
 export const ASSISTANTS: { id: ModelId; label: string; provider: ProviderId }[] = [
   { id: 'claude-opus-4-7', label: 'BulleBrowser Pro', provider: 'anthropic' },
   { id: 'claude-sonnet-4-6', label: 'BulleBrowser Balanced', provider: 'anthropic' },
   { id: 'claude-haiku-4-5-20251001', label: 'BulleBrowser Fastest', provider: 'anthropic' },
+  { id: 'gpt-4o', label: 'BulleBrowser Open', provider: 'openai' },
+  { id: 'gpt-4o-mini', label: 'BulleBrowser Open Fast', provider: 'openai' },
 ];
 
 // Client-facing name for a provider's credential. Used in "connect your key"

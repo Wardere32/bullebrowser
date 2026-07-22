@@ -8,7 +8,12 @@ import { join } from 'node:path';
 const here = dirname(fileURLToPath(import.meta.url));
 const appRoot = resolve(here, '..');
 
-async function launch() {
+async function launch(
+  {
+    openAiOnly = false,
+    withoutOpenAiKey = false,
+  }: { openAiOnly?: boolean; withoutOpenAiKey?: boolean } = {},
+) {
   // Fresh user-data dir per test so we always start from default settings.
   const userData = mkdtempSync(join(tmpdir(), 'bullebrowser-e2e-'));
 
@@ -29,7 +34,17 @@ async function launch() {
   // failed on CI, where there is no .env. hasApiKey() falls back to the
   // environment, so a fixture value is enough to render the composer. It is
   // never used to reach the network: no test here starts an agent run.
-  env.ANTHROPIC_API_KEY = 'sk-ant-e2e-fixture-key-not-real-0000000000000000';
+  delete env.ANTHROPIC_API_KEY;
+  delete env.OPENAI_API_KEY;
+  if (!openAiOnly) {
+    env.ANTHROPIC_API_KEY = 'sk-ant-e2e-fixture-key-not-real-0000000000000000';
+  }
+  // Voice controls need Whisper's OpenAI credential even in the normal
+  // Anthropic-assistant fixture. An explicit empty value also prevents the
+  // app's development .env loader from supplying one in the missing-key test.
+  env.OPENAI_API_KEY = withoutOpenAiKey
+    ? ''
+    : 'sk-e2e-fixture-key-not-real-0000000000000000';
 
   const app = await electron.launch({
     args: ['.', '--no-sandbox', `--user-data-dir=${userData}`],
@@ -61,6 +76,33 @@ test('the composer exposes the attachment menu and voice controls', async () => 
   await expect(win.locator('[aria-label="Voice input"]')).toBeVisible();
   await expect(win.locator('[aria-label="Voice Mode"]')).toBeVisible();
   await expect(win.locator('[aria-label="Open bullebrowser.com"]')).toBeVisible();
+  await app.close();
+});
+
+test('a saved OpenAI key enables the assistant and voice controls', async () => {
+  const { app, win } = await launch({ openAiOnly: true });
+  const savedModel = await win.evaluate(async () => {
+    await window.bullebrowser.secrets.setApiKey(
+      'sk-e2e-saved-openai-key-not-real-0000000000000000',
+      'openai',
+    );
+    await window.bullebrowser.settings.set({ defaultModel: 'gpt-4o' });
+    return (await window.bullebrowser.settings.get()).defaultModel;
+  });
+  expect(savedModel).toBe('gpt-4o');
+  await win.reload();
+  await expect(win.locator('aside textarea')).toBeEnabled();
+  await expect(win.locator('[aria-label="Voice input"]')).toBeVisible();
+  await expect(win.locator('[aria-label="Voice Mode"]')).toBeVisible();
+  await expect(win.locator('aside select').nth(1)).toHaveValue('gpt-4o');
+  await app.close();
+});
+
+test('voice controls open Settings when the OpenAI key is absent', async () => {
+  const { app, win } = await launch({ withoutOpenAiKey: true });
+  await win.locator('[aria-label="Voice input"]').click();
+  await expect(win.getByText('Voice (OpenAI Whisper) key', { exact: true })).toBeVisible();
+  await expect(win.getByRole('button', { name: 'Cancel' })).toBeHidden();
   await app.close();
 });
 
