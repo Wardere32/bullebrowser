@@ -1,12 +1,17 @@
+'use client';
+
 /* eslint-disable @next/next/no-img-element */
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { product } from '@bullebrowser/brand-tokens';
 import { asset } from '@/lib/asset';
 import { TranslationMenu } from './TranslationMenu';
 
 // The site's only navigation. Home leads, then the sections, then Download,
 // then the Translation picker. The tab labels stay constant across languages,
-// as fixed section names, rather than translating with the page body.
+// as fixed section names, rather than translating with the page body. The item
+// for the page you're on is highlighted with the same teal box the Download
+// button uses, so the active section is obvious.
 //
 // The bar is h-20 and the wordmark h-12 — a middle size between the original
 // and the larger trial — leaving 16px of clearance above and below so the mark
@@ -20,6 +25,7 @@ const LINKS = [
 ];
 
 export function Header() {
+  const pathname = usePathname();
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-surface-light/90 backdrop-blur">
       <div className="mx-auto flex h-20 max-w-6xl items-center justify-between gap-6 px-6">
@@ -32,16 +38,24 @@ export function Header() {
           />
         </Link>
 
-        <nav className="flex items-center gap-4 text-[15px] sm:gap-6">
-          {LINKS.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              className="text-ink-secondary transition-colors hover:text-ink-primary"
-            >
-              {l.label}
-            </Link>
-          ))}
+        <nav className="flex items-center gap-1 text-[15px] sm:gap-2">
+          {LINKS.map((l) => {
+            const active = l.href === '/' ? pathname === '/' : pathname.startsWith(l.href);
+            return (
+              <Link
+                key={l.href}
+                href={l.href}
+                aria-current={active ? 'page' : undefined}
+                className={`rounded-md px-3 py-1.5 transition-colors ${
+                  active
+                    ? 'bg-primary font-semibold text-white shadow-sm hover:bg-primary-hover'
+                    : 'text-ink-secondary hover:text-ink-primary'
+                }`}
+              >
+                {l.label}
+              </Link>
+            );
+          })}
           <TranslationMenu />
         </nav>
       </div>
