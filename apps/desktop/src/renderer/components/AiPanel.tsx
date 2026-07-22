@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { product } from '@bullebrowser/brand-tokens';
-import { skills, ASSISTANTS, providerFor, type ModelId } from '@bullebrowser/agent-core';
+import { providerFor, type ModelId } from '@bullebrowser/agent-core';
 import { useAgentStore } from '../state/agent-store.js';
 import { useBrowserStore } from '../state/browser-store.js';
 import { AGENT_PROMPT_EVENT } from '../lib/url.js';
@@ -40,8 +40,6 @@ export const FOCUS_AI_PANEL_EVENT = 'bullebrowser:focus-ai-panel';
 function browserBridge(): any {
   return (window as unknown as { bullebrowser: any }).bullebrowser;
 }
-
-const MODELS = ASSISTANTS;
 
 export function AiPanel() {
   const current = useAgentStore((s) => s.current);
@@ -175,6 +173,12 @@ export function AiPanel() {
   const send = async () => {
     const t = draft.trim();
     if (!t) return;
+    // The assistant is always reachable; the one required setup step (a key) is
+    // surfaced here, when it's actually needed, rather than as an up-front wall.
+    if (hasKey === false) {
+      openSettings();
+      return;
+    }
     const atts = attachments;
     setDraft('');
     setAttachments([]);
@@ -404,40 +408,13 @@ export function AiPanel() {
         />
       )}
 
-      <div className="flex items-center gap-3 px-4 pb-2 text-xs">
-        <select
-          value={skillId}
-          onChange={(e) => setSkillId(e.target.value)}
-          className="flex-1 rounded-md bg-transparent py-1 text-ink-secondary transition-colors hover:text-ink-primary focus:outline-none"
-        >
-          <option value="">Skills: free chat</option>
-          {skills.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.label}
-            </option>
-          ))}
-        </select>
-        <select
-          value={model}
-          onChange={(e) => setModel(e.target.value as ModelId)}
-          className="rounded-md bg-transparent py-1 text-ink-secondary transition-colors hover:text-ink-primary focus:outline-none"
-        >
-          {MODELS.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
       <div className="relative flex flex-1 flex-col overflow-hidden">
       <div
         ref={messagesRef}
         onScroll={onMessagesScroll}
         className="flex-1 overflow-y-auto px-5 py-5"
       >
-        {hasKey === false && <ConnectKey model={model} onConnected={() => setHasKey(true)} />}
-        {hasKey === true && current && current.messages.length === 0 && (
+        {current && current.messages.length === 0 && (
           <EmptyState
             onAction={(text, skill) => {
               setDraft(text);
@@ -447,11 +424,10 @@ export function AiPanel() {
             onSpeak={() => void startVoice('once')}
           />
         )}
-        {hasKey === true &&
-          current?.messages.map((m, i) => (
-            <Bubble key={i} role={m.role} content={m.content} />
-          ))}
-        {hasKey === true && (status === 'running' || status === 'error') && (
+        {current?.messages.map((m, i) => (
+          <Bubble key={i} role={m.role} content={m.content} />
+        ))}
+        {(status === 'running' || status === 'error') && (
           <ActivityFeed steps={steps} status={status} currentStep={currentStep} />
         )}
       </div>
@@ -478,12 +454,20 @@ export function AiPanel() {
       <AllowAccess task={lastUserMessage} />
 
       <footer className="border-t border-line/25 p-3">
-        {hasKey === false ? (
-          <div className="px-1 py-2 text-[11px] text-ink-secondary">
-            Connect your key above to start chatting.
-          </div>
-        ) : (
-          <>
+        {hasKey === false && (
+          <button
+            type="button"
+            onClick={openSettings}
+            className="mb-2 flex w-full items-center gap-2 rounded-lg border border-primary/30 bg-primary/[0.06] px-3 py-2 text-left text-[12px] text-ink-primary transition-colors hover:bg-primary/10"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-primary" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="8" cy="15" r="4" />
+              <path d="m10.9 12.1 8.1-8.1M17 5l2 2M14 8l2 2" />
+            </svg>
+            <span className="flex-1">Add your key to start — it stays on this device.</span>
+            <span className="font-medium text-primary">Open Settings →</span>
+          </button>
+        )}
         {draft.startsWith('/') && !draft.includes(' ') && (
           <div className="mb-1 max-h-32 overflow-y-auto rounded border border-line bg-white text-[11px]">
             {SLASH_COMMANDS.filter((c) => c.name.startsWith(draft.toLowerCase())).map(
@@ -502,11 +486,6 @@ export function AiPanel() {
                 </button>
               ),
             )}
-          </div>
-        )}
-        {skillId && (
-          <div className="mb-1 px-1 text-[11px] text-ink-secondary">
-            {skills.find((s) => s.id === skillId)?.inputPlaceholder}
           </div>
         )}
         {queued.length > 0 && (
@@ -683,8 +662,6 @@ export function AiPanel() {
             </svg>
           </button>
         </div>
-          </>
-        )}
       </footer>
     </aside>
   );
@@ -757,68 +734,6 @@ function HistoryList({
           ))
         )}
       </div>
-    </div>
-  );
-}
-
-// Without a key the agent cannot answer at all, so this replaces the chat
-// rather than sitting beside it — the previous behaviour surfaced the failure
-// as one line of small red text in the step feed, which read as "the chat is
-// just broken".
-function ConnectKey({ model, onConnected }: { model: ModelId; onConnected: () => void }) {
-  const assistant = ASSISTANTS.find((a) => a.id === model);
-  const provider = providerFor(model);
-  const hint = provider === 'openai' ? 'sk-…' : 'sk-ant-…';
-  const [key, setKey] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-
-  const connect = async () => {
-    if (!key.trim() || busy) return;
-    setBusy(true);
-    setError('');
-    try {
-      await browserBridge().secrets.setApiKey(key.trim(), provider);
-      setKey('');
-      onConnected();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not save that key.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="space-y-4 pt-2 text-sm">
-      <p className="text-[15px] font-semibold tracking-tight text-ink-primary">
-        Connect {assistant?.label ?? 'BulleBrowser AI'}
-      </p>
-      <p className="leading-relaxed text-ink-secondary">
-        BulleBrowser needs your {assistant?.label ?? ''} key before it can browse
-        or answer. It&apos;s encrypted and stored on this device only — no
-        keychain prompt, and it never leaves your machine.
-      </p>
-      <input
-        type="password"
-        value={key}
-        onChange={(e) => setKey(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') void connect();
-        }}
-        placeholder={hint}
-        autoComplete="off"
-        spellCheck={false}
-        className="w-full rounded-md border border-line px-3 py-2 font-mono text-xs focus:border-primary focus:outline-none"
-      />
-      {error && <div className="text-xs text-danger">{error}</div>}
-      <button
-        type="button"
-        onClick={() => void connect()}
-        disabled={!key.trim() || busy}
-        className="rounded bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-hover disabled:bg-line"
-      >
-        {busy ? 'Connecting…' : 'Connect'}
-      </button>
     </div>
   );
 }

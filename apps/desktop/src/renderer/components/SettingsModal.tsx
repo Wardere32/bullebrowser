@@ -108,6 +108,17 @@ export function SettingsModal() {
   return (
     <Modal title="Settings" onClose={closeSettings} width={560}>
       <section className="space-y-4">
+        <p className="text-xs leading-relaxed text-ink-secondary">
+          BulleBrowser works as one assistant — type or speak, and it reads,
+          compares, and acts across your tabs. The engine is chosen for you; the
+          controls below are optional.
+        </p>
+
+        <details open={!hasKey || !hasVoiceKey} className="rounded-lg border border-line/60 bg-surface-muted/20 px-3 py-2">
+          <summary className="cursor-pointer select-none text-xs font-semibold uppercase tracking-wide text-ink-secondary">
+            Developer / Advanced — engine &amp; keys
+          </summary>
+          <div className="mt-3 space-y-4">
         <div>
           <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-secondary">
             {assistantLabel} key
@@ -240,6 +251,8 @@ export function SettingsModal() {
             ))}
           </select>
         </div>
+          </div>
+        </details>
 
         <div>
           <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-secondary">

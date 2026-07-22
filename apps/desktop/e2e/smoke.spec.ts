@@ -94,7 +94,6 @@ test('a saved OpenAI key enables the assistant and voice controls', async () => 
   await expect(win.locator('aside textarea')).toBeEnabled();
   await expect(win.locator('[aria-label="Voice input"]')).toBeVisible();
   await expect(win.locator('[aria-label="Voice Mode"]')).toBeVisible();
-  await expect(win.locator('aside select').nth(1)).toHaveValue('gpt-4o');
   await app.close();
 });
 
