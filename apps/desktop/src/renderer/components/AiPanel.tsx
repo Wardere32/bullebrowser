@@ -44,6 +44,7 @@ function browserBridge(): any {
 export function AiPanel() {
   const current = useAgentStore((s) => s.current);
   const openSettings = useBrowserStore((s) => s.openSettings);
+  const showSettings = useBrowserStore((s) => s.showSettings);
   const setCurrent = useAgentStore((s) => s.setCurrent);
   // The history list renders from this; without the selector the identifier is
   // simply undefined and opening History throws.
@@ -310,6 +311,20 @@ export function AiPanel() {
       cancelled = true;
     };
   }, [model]);
+
+  // The key is entered in the Settings modal — a separate component — so the
+  // panel has to re-check when it closes. Without this, saving a key never
+  // clears the in-panel "add your key" state, and the assistant keeps asking
+  // even though Settings said "saved".
+  const settingsWasOpen = useRef(false);
+  useEffect(() => {
+    if (settingsWasOpen.current && !showSettings) {
+      void browserBridge()
+        .secrets.hasApiKey(providerFor(model))
+        .then((present: boolean) => setHasKey(present));
+    }
+    settingsWasOpen.current = showSettings;
+  }, [showSettings, model]);
 
   // The task the "Allow Access" prompt is asking about — always the message
   // that kicked off the current run.
