@@ -64,7 +64,9 @@ function decrypt(stored: string): string | null {
 // common paste error of putting a key in the wrong provider's box.
 const KEY_SHAPE: Record<ProviderId, { prefix: RegExp; label: string }> = {
   anthropic: { prefix: /^sk-ant-/, label: "a key starting with 'sk-ant-'" },
-  openai: { prefix: /^sk-/, label: "a key starting with 'sk-'" },
+  // sk-ant- also starts with sk-, so exclude it explicitly — otherwise an
+  // Anthropic key pasted into the OpenAI/voice box passes and then 401s later.
+  openai: { prefix: /^sk-(?!ant-)/, label: "an OpenAI key (starts with 'sk-', not 'sk-ant-')" },
 };
 
 function envKey(provider: ProviderId): string | null {

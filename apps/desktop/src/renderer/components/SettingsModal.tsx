@@ -126,6 +126,7 @@ export function SettingsModal() {
           <p className="mt-1 text-xs text-ink-secondary">
             Encrypted and stored on this device only — no keychain prompt. Used
             only to call {assistantLabel} directly from your machine.
+            {provider === 'openai' && ' This same key also powers voice transcription.'}
           </p>
           {hasKey ? (
             <div className="mt-2 flex items-center gap-2">
@@ -179,6 +180,7 @@ export function SettingsModal() {
           )}
         </div>
 
+        {provider !== 'openai' && (
         <div>
           <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-secondary">
             Voice (OpenAI Whisper) key
@@ -234,6 +236,7 @@ export function SettingsModal() {
             </div>
           )}
         </div>
+        )}
 
         <div>
           <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-secondary">

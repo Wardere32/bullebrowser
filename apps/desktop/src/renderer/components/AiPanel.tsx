@@ -97,14 +97,22 @@ export function AiPanel() {
       const bridge = browserBridge();
       const settings: AppSettings = await bridge.settings.get();
       const configuredProvider = providerFor(settings.defaultModel);
-      const [configuredKeyPresent, openAiKeyPresent] = await Promise.all([
-        bridge.secrets.hasApiKey(configuredProvider),
+      const [hasAnthropic, hasOpenAi] = await Promise.all([
+        bridge.secrets.hasApiKey('anthropic'),
         bridge.secrets.hasApiKey('openai'),
       ]);
-      const effectiveSettings =
-        !configuredKeyPresent && configuredProvider !== 'openai' && openAiKeyPresent
-          ? await bridge.settings.set({ defaultModel: 'gpt-4o' })
-          : settings;
+      const configuredKeyPresent = configuredProvider === 'openai' ? hasOpenAi : hasAnthropic;
+      // Auto-pick an engine whose key is actually present, in EITHER direction,
+      // so a user holding only one provider's key isn't stranded on "add your
+      // key" just because the persisted default points at the other provider.
+      let effectiveSettings = settings;
+      if (!configuredKeyPresent) {
+        if (configuredProvider !== 'openai' && hasOpenAi) {
+          effectiveSettings = await bridge.settings.set({ defaultModel: 'gpt-4o' });
+        } else if (configuredProvider === 'openai' && hasAnthropic) {
+          effectiveSettings = await bridge.settings.set({ defaultModel: 'claude-opus-4-7' });
+        }
+      }
       setModel(effectiveSettings.defaultModel);
       setHasKey(
         effectiveSettings.defaultModel === settings.defaultModel ? configuredKeyPresent : true,
@@ -171,6 +179,23 @@ export function AiPanel() {
     startRun(runId);
   };
 
+  // Queue a task if one is already running (or waiting), else dispatch it now.
+  // EVERY entry point that can start work — the composer, a voice transcript,
+  // an address-bar prompt — goes through here so two runs never overlap. The
+  // running check reads live store state rather than a render snapshot, because
+  // voice transcripts fire from a long-lived overlay closure that would
+  // otherwise see a stale value and start a second, concurrent run.
+  const submit = async (text: string, atts: UiAttachment[] = []) => {
+    const t = text.trim();
+    if (!t) return;
+    const running = useAgentStore.getState().status === 'running';
+    if (running || queued.length > 0) {
+      setQueued((q) => [...q, { text: t, attachments: atts }]);
+      return;
+    }
+    await sendMessage(t, atts);
+  };
+
   const send = async () => {
     const t = draft.trim();
     if (!t) return;
@@ -184,13 +209,7 @@ export function AiPanel() {
     setDraft('');
     setAttachments([]);
     promptActivity.reset();
-    // Busy? Queue it (with its attachments). It'll run when the current task
-    // (and anything ahead of it) finishes. Otherwise start it now.
-    if (runInProgress || queued.length > 0) {
-      setQueued((q) => [...q, { text: t, attachments: atts }]);
-      return;
-    }
-    await sendMessage(t, atts);
+    await submit(t, atts);
   };
 
   // Drain the queue: whenever the agent goes idle and something is waiting,
@@ -218,7 +237,7 @@ export function AiPanel() {
   const onVoiceTranscript = (text: string) => {
     const t = text.trim();
     if (!t) return;
-    void sendMessage(t, attachments);
+    void submit(t, attachments);
     setAttachments([]);
     setDraft('');
   };
@@ -267,7 +286,7 @@ export function AiPanel() {
     const handler = (e: Event) => {
       const text = (e as CustomEvent<string>).detail;
       if (!text) return;
-      if (current) void sendMessage(text);
+      if (current) void submit(text);
       else queuedPrompt.current = text;
     };
     window.addEventListener(AGENT_PROMPT_EVENT, handler);
@@ -287,7 +306,7 @@ export function AiPanel() {
     if (current && queuedPrompt.current) {
       const text = queuedPrompt.current;
       queuedPrompt.current = null;
-      void sendMessage(text);
+      void submit(text);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current]);
@@ -312,19 +331,23 @@ export function AiPanel() {
     };
   }, [model]);
 
-  // The key is entered in the Settings modal — a separate component — so the
-  // panel has to re-check when it closes. Without this, saving a key never
-  // clears the in-panel "add your key" state, and the assistant keeps asking
-  // even though Settings said "saved".
+  // Both the key and the engine are chosen in the Settings modal — a separate
+  // component — so when it closes the panel re-syncs from persisted settings.
+  // Without this, a saved key never clears the "add your key" state (the panel
+  // keeps asking even though Settings said "saved"), and changing the engine
+  // has no effect until the next launch.
   const settingsWasOpen = useRef(false);
   useEffect(() => {
     if (settingsWasOpen.current && !showSettings) {
-      void browserBridge()
-        .secrets.hasApiKey(providerFor(model))
-        .then((present: boolean) => setHasKey(present));
+      void (async () => {
+        const bridge = browserBridge();
+        const next: AppSettings = await bridge.settings.get();
+        setModel(next.defaultModel);
+        setHasKey(await bridge.secrets.hasApiKey(providerFor(next.defaultModel)));
+      })();
     }
     settingsWasOpen.current = showSettings;
-  }, [showSettings, model]);
+  }, [showSettings]);
 
   // The task the "Allow Access" prompt is asking about — always the message
   // that kicked off the current run.
