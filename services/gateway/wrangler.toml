@@ -1,0 +1,19 @@
+name = "bullebrowser-gateway"
+main = "src/worker.mjs"
+compatibility_date = "2024-11-01"
+
+# Free allowance + spend backstops. Safe to edit.
+[vars]
+FREE_PROMPTS = "15"            # free prompts per install before it asks for a key
+DAILY_IP_LIMIT = "200"         # per-IP request cap per day (abuse backstop)
+MONTHLY_GLOBAL_LIMIT = "5000"  # global request cap per month (spend backstop)
+
+# Metering store. Create it, then paste the id here:
+#   wrangler kv namespace create METER
+[[kv_namespaces]]
+binding = "METER"
+id = "PASTE_KV_NAMESPACE_ID_HERE"
+
+# Secrets are NOT stored in this file. Set them once (never committed):
+#   wrangler secret put ANTHROPIC_API_KEY
+#   wrangler secret put OPENAI_API_KEY
