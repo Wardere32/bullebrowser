@@ -32,7 +32,7 @@ const LANGUAGES: Language[] = [
 
 const STORAGE_KEY = 'bullebrowser:lang';
 
-export function TranslationMenu() {
+export function TranslationMenu({ dark = false }: { dark?: boolean } = {}) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState<Language>(LANGUAGES[0]!);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -80,7 +80,9 @@ export function TranslationMenu() {
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label="Translation"
-        className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-ink-secondary transition-colors hover:text-ink-primary"
+        className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm transition-colors ${
+          dark ? 'text-white/80 hover:text-white' : 'text-ink-secondary hover:text-ink-primary'
+        }`}
       >
         <span className="text-base leading-none" aria-hidden>{active.flag}</span>
         <span className="sr-only">Translation</span>

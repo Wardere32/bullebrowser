@@ -4,7 +4,7 @@
 
 :root {
   --color-primary: #20bad1;
-  --color-accent: #2563eb;
+  --color-accent: #20bad1;
   /* Width of the persistent left rail on desktop. Consumed by the shell
      grid in layout.tsx via Tailwind's arbitrary-value syntax and kept here
      as the single source of truth. */

@@ -13,11 +13,11 @@ const config: Config = {
           hover: '#1FA6BB',
         },
         accent: {
-          DEFAULT: '#2563EB',
-          hover: '#1D4ED8',
+          DEFAULT: '#20BAD1',
+          hover: '#1FA6BB',
         },
         surface: {
-          dark: '#0B1E3D',
+          dark: '#142127',
           light: '#FFFFFF',
           muted: '#F9FAFB',
         },
