@@ -10,29 +10,29 @@ const config: Config = {
       colors: {
         primary: {
           DEFAULT: '#20BAD1',
-          hover: '#1A9BAE',
+          hover: '#1FA6BB',
         },
         accent: {
-          DEFAULT: '#E8D833',
-          hover: '#CBBC26',
+          DEFAULT: '#2563EB',
+          hover: '#1D4ED8',
         },
         surface: {
-          dark: '#071422',
+          dark: '#0B1E3D',
           light: '#FFFFFF',
-          muted: '#EFF7F8',
+          muted: '#F9FAFB',
         },
         ink: {
-          primary: '#191825',
-          secondary: '#5F6772',
+          primary: '#142127',
+          secondary: '#6B7280',
           inverse: '#FFFFFF',
         },
         line: {
-          DEFAULT: '#DCE9EC',
-          strong: '#BFD4D9',
+          DEFAULT: '#E5E7EB',
+          strong: '#CBD5E1',
         },
       },
       fontFamily: {
-        ui: ['"DM Sans"', 'system-ui', 'sans-serif'],
+        ui: ['Inter', 'system-ui', 'sans-serif'],
         mono: ['var(--font-jetbrains)', 'ui-monospace', 'Menlo', 'monospace'],
       },
     },

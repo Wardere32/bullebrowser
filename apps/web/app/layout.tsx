@@ -3,10 +3,10 @@ import { JetBrains_Mono } from 'next/font/google';
 // Self-hosted rather than fetched from Google at build time: next/font/google
 // downloads the family during `next build`, which makes the build depend on
 // reaching fonts.googleapis.com. @fontsource ships the files in the package.
-import '@fontsource/dm-sans/400.css';
-import '@fontsource/dm-sans/500.css';
-import '@fontsource/dm-sans/600.css';
-import '@fontsource/dm-sans/700.css';
+import '@fontsource/inter/400.css';
+import '@fontsource/inter/500.css';
+import '@fontsource/inter/600.css';
+import '@fontsource/inter/700.css';
 import { product } from '@bullebrowser/brand-tokens';
 import { LocaleProvider } from '@/lib/i18n';
 import { Header } from '@/components/Header';
